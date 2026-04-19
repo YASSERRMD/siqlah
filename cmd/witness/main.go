@@ -185,6 +185,7 @@ func runVerify(args []string) error {
 	opPubHex := fs.String("op-pub", "", "operator public key hex (required)")
 	origin := fs.String("origin", witness.DefaultOrigin, "C2SP log origin string")
 	threshold := fs.Int("threshold", 0, "minimum required witness cosignatures for C2SP verify")
+	checkRekor := fs.Bool("check-rekor", false, "also verify Rekor public anchoring status")
 	// Legacy mode flags
 	legacy := fs.Bool("legacy", false, "use legacy checkpoint verify instead of C2SP")
 	cpID := fs.Int64("cp", 0, "checkpoint ID (legacy mode only)")
@@ -221,6 +222,16 @@ func runVerify(args []string) error {
 			return nil
 		}
 		fmt.Printf("witnesses: %d\n", len(witnesses))
+		if *checkRekor && *cpID != 0 {
+			vr, err := fetchVerifyResponse(*ledger, *cpID)
+			if err != nil {
+				fmt.Printf("rekor: error fetching (%v)\n", err)
+			} else if vr.RekorAnchored {
+				fmt.Printf("rekor: ANCHORED (log_index=%d url=%s)\n", vr.RekorLogIndex, vr.RekorEntryURL)
+			} else {
+				fmt.Println("rekor: NOT ANCHORED")
+			}
+		}
 		return nil
 	}
 
@@ -333,19 +344,33 @@ func fetchCheckpoint(ledger string, id int64) (*store.Checkpoint, error) {
 	return &cp, nil
 }
 
-func fetchWitnesses(ledger string, cpID int64) (map[string]string, error) {
+type verifyResponse struct {
+	OperatorValid bool              `json:"operator_valid"`
+	Witnesses     map[string]string `json:"witnesses"`
+	RekorAnchored bool              `json:"rekor_anchored"`
+	RekorLogIndex int64             `json:"rekor_log_index"`
+	RekorEntryURL string            `json:"rekor_entry_url"`
+}
+
+func fetchVerifyResponse(ledger string, cpID int64) (*verifyResponse, error) {
 	resp, err := http.Get(ledger + "/v1/checkpoints/" + strconv.FormatInt(cpID, 10) + "/verify")
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	var vresp struct {
-		Witnesses map[string]string `json:"witnesses"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&vresp); err != nil {
+	var vr verifyResponse
+	if err := json.NewDecoder(resp.Body).Decode(&vr); err != nil {
 		return nil, err
 	}
-	return vresp.Witnesses, nil
+	return &vr, nil
+}
+
+func fetchWitnesses(ledger string, cpID int64) (map[string]string, error) {
+	vr, err := fetchVerifyResponse(ledger, cpID)
+	if err != nil {
+		return nil, err
+	}
+	return vr.Witnesses, nil
 }
 
 func submitWitness(ledger string, cpID int64, witnessID, sigHex string) error {

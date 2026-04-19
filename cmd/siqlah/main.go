@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/yasserrmd/siqlah/internal/anchor"
 	"github.com/yasserrmd/siqlah/internal/api"
 	"github.com/yasserrmd/siqlah/internal/checkpoint"
 	"github.com/yasserrmd/siqlah/internal/monitor"
@@ -54,6 +55,8 @@ func main() {
 	oidcClientID := flag.String("oidc-client-id", "", "OIDC client ID for Fulcio token flow")
 	rekorURL := flag.String("rekor-url", "", "Rekor transparency log URL (empty disables Rekor logging)")
 	fulcioURL := flag.String("fulcio-url", "https://fulcio.sigstore.dev", "Fulcio CA endpoint for keyless signing")
+	rekorAnchor := flag.Bool("rekor-anchor", false, "enable periodic Rekor public anchoring")
+	rekorInterval := flag.Duration("rekor-anchor-interval", 24*time.Hour, "interval between Rekor anchoring attempts")
 	flag.Parse()
 
 	_, _ = *oidcClientID, *oidcIssuer // surfaced for future integration
@@ -150,6 +153,17 @@ func main() {
 			}
 		}
 	}()
+
+	// Optionally start Rekor public anchoring scheduler.
+	if *rekorAnchor {
+		ra, err := anchor.NewRekorAnchor(*rekorURL)
+		if err != nil {
+			log.Fatalf("create rekor anchor: %v", err)
+		}
+		sched := anchor.NewAnchorScheduler(ra, st, *rekorInterval)
+		go sched.Run(ctx)
+		log.Printf("rekor anchoring enabled: %s every %s", *rekorURL, *rekorInterval)
+	}
 
 	// Optionally start discrepancy monitor.
 	if *enableMonitor {
