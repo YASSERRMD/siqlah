@@ -63,7 +63,9 @@ func (b *Builder) BuildAndSign() (*store.Checkpoint, error) {
 		prevRootHex = prev.RootHex
 	}
 
-	now := time.Now().UTC()
+	// Truncate to whole seconds so the timestamp survives the SQLite Unix-second round-trip
+	// and can be reconstructed identically for signature verification.
+	now := time.Now().UTC().Truncate(time.Second)
 	payload := &SignedPayload{
 		BatchStart:      batchStart,
 		BatchEnd:        batchEnd,
