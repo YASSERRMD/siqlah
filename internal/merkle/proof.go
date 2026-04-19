@@ -1,8 +1,5 @@
 package merkle
 
-// DEPRECATED: Use Tessera backend for production (--log-backend=tessera).
-// This package is retained for the SQLite legacy backend and testing environments without Tessera.
-
 import (
 	"errors"
 	"fmt"
@@ -10,6 +7,8 @@ import (
 
 // InclusionProof returns the audit path for leaves[index].
 // Proof is ordered from leaf level (innermost) to root level (outermost).
+//
+// Deprecated: Use the Tessera backend (--log-backend=tessera) for production inclusion proofs.
 func InclusionProof(leaves [][32]byte, index int) ([][32]byte, error) {
 	if len(leaves) == 0 {
 		return nil, errors.New("empty tree")
@@ -48,6 +47,8 @@ func splitPoint(n int) int {
 
 // VerifyInclusion verifies that leafHash is at index in a tree of treeSize leaves
 // with the given root, using the provided audit path (inner-to-outer order).
+//
+// Deprecated: Use the Tessera backend (--log-backend=tessera) for production proof verification.
 func VerifyInclusion(leafHash, root [32]byte, index, treeSize int, proof [][32]byte) bool {
 	if treeSize == 0 || index < 0 || index >= treeSize {
 		return false
