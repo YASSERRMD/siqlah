@@ -104,42 +104,52 @@ func (s *Server) handleConsistencyProof(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if oldCP.TreeSize >= newCP.TreeSize {
-		writeError(w, http.StatusBadRequest, "old_id must refer to a smaller tree than id")
-		return
-	}
-
-	receipts, err := s.store.GetReceiptsByRange(oldCP.BatchStart, newCP.BatchEnd)
+	// Use cumulative tree sizes: get all receipts from the very first row up to each checkpoint's
+	// end, so the consistency proof works across a growing log.
+	oldReceipts, err := s.store.GetReceiptsByRange(1, oldCP.BatchEnd)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "fetch receipts: "+err.Error())
+		writeError(w, http.StatusInternalServerError, "fetch old receipts: "+err.Error())
+		return
+	}
+	newReceipts, err := s.store.GetReceiptsByRange(1, newCP.BatchEnd)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "fetch new receipts: "+err.Error())
 		return
 	}
 
-	leaves, err := leavesFromReceipts(receipts)
+	oldSize := len(oldReceipts)
+	newSize := len(newReceipts)
+
+	if oldSize >= newSize {
+		writeError(w, http.StatusBadRequest,
+			fmt.Sprintf("old checkpoint has %d cumulative receipts, new has %d — old must be strictly smaller", oldSize, newSize))
+		return
+	}
+
+	leaves, err := leavesFromReceipts(newReceipts)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "build leaves: "+err.Error())
 		return
 	}
 
-	if len(leaves) < newCP.TreeSize {
-		writeError(w, http.StatusInternalServerError,
-			fmt.Sprintf("expected %d leaves, got %d", newCP.TreeSize, len(leaves)))
-		return
-	}
-
-	proof, err := merkle.ConsistencyProof(oldCP.TreeSize, newCP.TreeSize, leaves[:newCP.TreeSize])
+	proof, err := merkle.ConsistencyProof(oldSize, newSize, leaves)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "consistency proof: "+err.Error())
 		return
 	}
 
+	// Compute cumulative roots for the old and new tree sizes.
+	oldLeaves, _ := leavesFromReceipts(oldReceipts)
+	oldRoot := merkle.BuildRoot(oldLeaves)
+	newRoot := merkle.BuildRoot(leaves)
+
 	writeJSON(w, http.StatusOK, ConsistencyProofResponse{
 		OldCheckpointID: oldID,
 		NewCheckpointID: newID,
-		OldSize:         oldCP.TreeSize,
-		NewSize:         newCP.TreeSize,
-		OldRootHex:      oldCP.RootHex,
-		NewRootHex:      newCP.RootHex,
+		OldSize:         oldSize,
+		NewSize:         newSize,
+		OldRootHex:      merkle.FormatRoot(oldRoot),
+		NewRootHex:      merkle.FormatRoot(newRoot),
 		Proof:           hexSlice(proof),
 	})
 }
