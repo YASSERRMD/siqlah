@@ -4,21 +4,24 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yasserrmd/siqlah/internal/model"
 	"github.com/yasserrmd/siqlah/pkg/vur"
 )
 
 // IngestRequest is the request body for POST /v1/receipts.
 type IngestRequest struct {
-	Provider     string          `json:"provider"`
-	Tenant       string          `json:"tenant"`
-	Model        string          `json:"model"`
-	ResponseBody json.RawMessage `json:"response_body"`
-	RequestBody  json.RawMessage `json:"request_body,omitempty"`
-	RequestID    string          `json:"request_id,omitempty"`
+	Provider             string          `json:"provider"`
+	Tenant               string          `json:"tenant"`
+	Model                string          `json:"model"`
+	ResponseBody         json.RawMessage `json:"response_body"`
+	RequestBody          json.RawMessage `json:"request_body,omitempty"`
+	RequestID            string          `json:"request_id,omitempty"`
+	ModelSignatureBundle string          `json:"model_signature_bundle,omitempty"` // OMS bundle JSON
 }
 
 // IngestBatchRequest is the request body for POST /v1/receipts/batch.
@@ -105,26 +108,57 @@ func (s *Server) buildReceipt(req IngestRequest) (*vur.Receipt, error) {
 	respHash := hashBytes(req.ResponseBody)
 
 	receipt := &vur.Receipt{
-		ID:           uuid.New().String(),
-		Version:      "1.0.0",
-		Tenant:       req.Tenant,
-		Provider:     req.Provider,
-		Model:        req.Model,
-		InputTokens:  usage.InputTokens,
-		OutputTokens: usage.OutputTokens,
+		ID:              uuid.New().String(),
+		Version:         "1.0.0",
+		Tenant:          req.Tenant,
+		Provider:        req.Provider,
+		Model:           req.Model,
+		InputTokens:     usage.InputTokens,
+		OutputTokens:    usage.OutputTokens,
 		ReasoningTokens: usage.ReasoningTokens,
-		RequestHash:  reqHash,
-		ResponseHash: respHash,
-		RequestID:    reqID,
-		Timestamp:    time.Now().UTC(),
-		SignerIdentity: hex.EncodeToString(s.operatorPub),
+		RequestHash:     reqHash,
+		ResponseHash:    respHash,
+		RequestID:       reqID,
+		Timestamp:       time.Now().UTC(),
+		SignerIdentity:  hex.EncodeToString(s.operatorPub),
 	}
+
+	// Populate OMS model identity fields (graceful degradation on failure).
+	s.populateModelIdentity(receipt, req.ModelSignatureBundle)
 
 	if err := vur.SignReceipt(receipt, s.operatorPriv); err != nil {
 		return nil, err
 	}
 	receipt.Verified = true
 	return receipt, nil
+}
+
+// populateModelIdentity resolves OMS model identity for a receipt.
+// If a bundle is provided it is verified; otherwise the registry is consulted.
+// Errors are logged but do not fail the ingestion.
+func (s *Server) populateModelIdentity(r *vur.Receipt, bundleJSON string) {
+	if bundleJSON != "" {
+		bundleJSON, _ = model.ParseBundleFromPEM(bundleJSON)
+		id, err := model.VerifyModelIdentity(bundleJSON, r.Model, model.VerifyOptions{})
+		if err != nil {
+			log.Printf("OMS bundle verification failed for model %q: %v", r.Model, err)
+			return
+		}
+		r.ModelSignerIdentity = id.SignerIdentity
+		r.ModelSignatureVerified = id.Verified
+		if id.ModelDigest != "" && r.ModelDigest == "" {
+			r.ModelDigest = id.ModelDigest
+		}
+		return
+	}
+
+	// Fall back to registry lookup.
+	id, err := s.modelReg.Lookup(r.Model)
+	if err != nil || id == nil {
+		return
+	}
+	r.ModelSignerIdentity = id.SignerIdentity
+	r.ModelSignatureVerified = id.Verified
 }
 
 func hashBytes(b []byte) string {
