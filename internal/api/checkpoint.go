@@ -18,9 +18,12 @@ type WitnessRequest struct {
 
 // CheckpointVerifyResponse is returned by GET /v1/checkpoints/{id}/verify.
 type CheckpointVerifyResponse struct {
-	OperatorValid bool              `json:"operator_valid"`
-	OperatorError string            `json:"operator_error,omitempty"`
-	Witnesses     map[string]string `json:"witnesses"`
+	OperatorValid  bool              `json:"operator_valid"`
+	OperatorError  string            `json:"operator_error,omitempty"`
+	Witnesses      map[string]string `json:"witnesses"`
+	RekorAnchored  bool              `json:"rekor_anchored"`
+	RekorLogIndex  int64             `json:"rekor_log_index,omitempty"`
+	RekorEntryURL  string            `json:"rekor_entry_url,omitempty"`
 }
 
 func (s *Server) handleBuildCheckpoint(w http.ResponseWriter, r *http.Request) {
@@ -122,6 +125,12 @@ func (s *Server) handleVerifyCheckpoint(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	resp.Witnesses = witnesses
+	if cp.RekorLogIndex >= 0 {
+		resp.RekorAnchored = true
+		resp.RekorLogIndex = cp.RekorLogIndex
+		resp.RekorEntryURL = "https://rekor.sigstore.dev/api/v1/log/entries?logIndex=" +
+			strconv.FormatInt(cp.RekorLogIndex, 10)
+	}
 	writeJSON(w, http.StatusOK, resp)
 }
 

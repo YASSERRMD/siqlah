@@ -32,10 +32,12 @@ type Config struct {
 	OIDCIssuer string `json:"oidc_issuer"`
 	// OIDCClientID is the OIDC client ID for interactive token flows.
 	OIDCClientID string `json:"oidc_client_id"`
-	// RekorURL is the Rekor transparency log URL (empty disables Rekor logging).
-	RekorURL string `json:"rekor_url"`
 	// FulcioURL is the Fulcio CA endpoint for keyless signing.
 	FulcioURL string `json:"fulcio_url"`
+	// Rekor public anchoring
+	RekorAnchor         bool          `json:"rekor_anchor"`          // enable anchoring (default false)
+	RekorURL            string        `json:"rekor_url"`             // Rekor endpoint
+	RekorAnchorInterval time.Duration `json:"rekor_anchor_interval"` // default 24h
 }
 
 // rawConfig mirrors Config with duration fields as strings for JSON parsing.
@@ -56,8 +58,10 @@ type rawConfig struct {
 	SigningBackend        string  `json:"signing_backend"`
 	OIDCIssuer           string  `json:"oidc_issuer"`
 	OIDCClientID         string  `json:"oidc_client_id"`
-	RekorURL             string  `json:"rekor_url"`
 	FulcioURL            string  `json:"fulcio_url"`
+	RekorAnchor          bool    `json:"rekor_anchor"`
+	RekorURL             string  `json:"rekor_url"`
+	RekorAnchorInterval  string  `json:"rekor_anchor_interval"`
 }
 
 // Defaults returns a Config populated with default values matching the CLI flags.
@@ -76,7 +80,9 @@ func Defaults() Config {
 		SigningBackend:        "ed25519",
 		OIDCIssuer:           "https://accounts.google.com",
 		FulcioURL:            "https://fulcio.sigstore.dev",
-		RekorURL:             "",
+		RekorAnchor:         false,
+		RekorURL:            "https://rekor.sigstore.dev",
+		RekorAnchorInterval: 24 * time.Hour,
 	}
 }
 
@@ -149,11 +155,19 @@ func Load(path string) (*Config, error) {
 	if raw.OIDCClientID != "" {
 		cfg.OIDCClientID = raw.OIDCClientID
 	}
+	if raw.FulcioURL != "" {
+		cfg.FulcioURL = raw.FulcioURL
+	}
+	cfg.RekorAnchor = raw.RekorAnchor
 	if raw.RekorURL != "" {
 		cfg.RekorURL = raw.RekorURL
 	}
-	if raw.FulcioURL != "" {
-		cfg.FulcioURL = raw.FulcioURL
+	if raw.RekorAnchorInterval != "" {
+		d, err := time.ParseDuration(raw.RekorAnchorInterval)
+		if err != nil {
+			return nil, fmt.Errorf("rekor_anchor_interval: %w", err)
+		}
+		cfg.RekorAnchorInterval = d
 	}
 
 	return &cfg, nil
