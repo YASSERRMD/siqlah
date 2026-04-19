@@ -1,10 +1,13 @@
 package api
 
 import (
+	"encoding/hex"
 	"net/http"
+	"strings"
 	"strconv"
 
 	"github.com/yasserrmd/siqlah/internal/checkpoint"
+	"github.com/yasserrmd/siqlah/internal/witness"
 )
 
 // WitnessRequest is the request body for POST /v1/checkpoints/{id}/witness.
@@ -63,6 +66,30 @@ func (s *Server) handleGetCheckpoint(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "checkpoint not found")
 		return
 	}
+	// Content negotiation: text/plain → C2SP signed note, application/json → legacy JSON.
+	accept := r.Header.Get("Accept")
+	if strings.Contains(accept, "text/plain") {
+		rootBytes, err := hex.DecodeString(cp.RootHex)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "decode root: "+err.Error())
+			return
+		}
+		body := witness.FormatCheckpoint(s.logOrigin, uint64(cp.TreeSize), rootBytes)
+		signer, err := witness.NewNoteSigner(s.logOrigin, s.operatorPriv)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "create signer: "+err.Error())
+			return
+		}
+		signed, err := witness.SignCheckpoint(body, signer)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "sign checkpoint: "+err.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = w.Write(signed)
+		return
+	}
+
 	writeJSON(w, http.StatusOK, cp)
 }
 
