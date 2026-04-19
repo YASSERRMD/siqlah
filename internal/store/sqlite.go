@@ -44,6 +44,24 @@ func (s *SQLiteStore) AppendReceipt(r vur.Receipt) (int64, error) {
 	return res.LastInsertId()
 }
 
+func (s *SQLiteStore) GetReceiptByID(id string) (*StoredReceipt, error) {
+	row := s.db.QueryRow(
+		`SELECT id, receipt_json FROM receipts WHERE json_extract(receipt_json,'$.id')=? LIMIT 1`, id)
+	var rowID int64
+	var js string
+	if err := row.Scan(&rowID, &js); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var r vur.Receipt
+	if err := json.Unmarshal([]byte(js), &r); err != nil {
+		return nil, fmt.Errorf("unmarshal receipt: %w", err)
+	}
+	return &StoredReceipt{RowID: rowID, Receipt: r}, nil
+}
+
 func (s *SQLiteStore) FetchUnbatched(limit int) ([]StoredReceipt, error) {
 	rows, err := s.db.Query(
 		`SELECT id, receipt_json FROM receipts WHERE batched=0 ORDER BY id ASC LIMIT ?`, limit)
