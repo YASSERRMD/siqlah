@@ -44,14 +44,14 @@ func (s *SQLiteStore) AppendReceipt(r vur.Receipt) (int64, error) {
 	return res.LastInsertId()
 }
 
-func (s *SQLiteStore) FetchUnbatched(limit int) ([]vur.Receipt, error) {
+func (s *SQLiteStore) FetchUnbatched(limit int) ([]StoredReceipt, error) {
 	rows, err := s.db.Query(
 		`SELECT id, receipt_json FROM receipts WHERE batched=0 ORDER BY id ASC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	return scanReceipts(rows)
+	return scanStoredReceipts(rows)
 }
 
 func (s *SQLiteStore) MarkBatched(ids []int64) error {
@@ -174,6 +174,23 @@ func (s *SQLiteStore) Stats() (*StoreStats, error) {
 }
 
 // --- helpers ---
+
+func scanStoredReceipts(rows *sql.Rows) ([]StoredReceipt, error) {
+	var out []StoredReceipt
+	for rows.Next() {
+		var rowID int64
+		var js string
+		if err := rows.Scan(&rowID, &js); err != nil {
+			return nil, err
+		}
+		var r vur.Receipt
+		if err := json.Unmarshal([]byte(js), &r); err != nil {
+			return nil, fmt.Errorf("unmarshal receipt %d: %w", rowID, err)
+		}
+		out = append(out, StoredReceipt{RowID: rowID, Receipt: r})
+	}
+	return out, rows.Err()
+}
 
 func scanReceipts(rows *sql.Rows) ([]vur.Receipt, error) {
 	var receipts []vur.Receipt

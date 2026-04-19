@@ -26,11 +26,17 @@ type StoreStats struct {
 	TotalWitnessSigs  int64
 }
 
+// StoredReceipt pairs a DB row ID with the receipt it holds.
+type StoredReceipt struct {
+	RowID   int64
+	Receipt vur.Receipt
+}
+
 // Store is the append-only storage interface for receipts and checkpoints.
 type Store interface {
 	// Receipt operations
 	AppendReceipt(r vur.Receipt) (int64, error)
-	FetchUnbatched(limit int) ([]vur.Receipt, error)
+	FetchUnbatched(limit int) ([]StoredReceipt, error)
 	MarkBatched(ids []int64) error
 	GetReceiptsByRange(startID, endID int64) ([]vur.Receipt, error)
 

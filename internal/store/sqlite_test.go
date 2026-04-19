@@ -43,15 +43,15 @@ func TestAppendFetch(t *testing.T) {
 	if id == 0 {
 		t.Fatal("expected non-zero id")
 	}
-	receipts, err := s.FetchUnbatched(10)
+	stored, err := s.FetchUnbatched(10)
 	if err != nil {
 		t.Fatalf("fetch: %v", err)
 	}
-	if len(receipts) != 1 {
-		t.Fatalf("expected 1 receipt, got %d", len(receipts))
+	if len(stored) != 1 {
+		t.Fatalf("expected 1 receipt, got %d", len(stored))
 	}
-	if receipts[0].ID != r.ID {
-		t.Errorf("receipt ID mismatch: got %s, want %s", receipts[0].ID, r.ID)
+	if stored[0].Receipt.ID != r.ID {
+		t.Errorf("receipt ID mismatch: got %s, want %s", stored[0].Receipt.ID, r.ID)
 	}
 }
 
@@ -75,6 +75,7 @@ func TestMarkBatched(t *testing.T) {
 	if len(remaining) != 2 {
 		t.Fatalf("expected 2 unbatched, got %d", len(remaining))
 	}
+	_ = remaining
 }
 
 func TestCheckpointSaveList(t *testing.T) {
