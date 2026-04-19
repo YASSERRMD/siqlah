@@ -1,110 +1,246 @@
-# siqlah (سِقلة)
+# siqlah &nbsp;·&nbsp; سِقلة
 
-**Verifiable Usage Receipts for AI API Calls**
+<p align="center">
+  <strong>Cryptographic accountability for AI API billing</strong><br>
+  Verifiable Usage Receipts · Ed25519 Signatures · RFC 6962 Merkle Proofs · Witness Cosigning
+</p>
 
-*siqlah* (Arabic: سِقلة, "ledger stone" / "record") is an open-source Verifiable Usage Receipt (VUR) system for AI token usage metering. It produces cryptographically verifiable, witness-cosigned, tamper-evident receipts for every AI API call — solving the fundamental trust gap where all current AI billing tools simply re-emit provider-reported token counts without any independent verification.
+<p align="center">
+  <a href="https://github.com/YASSERRMD/siqlah/actions/workflows/ci.yml">
+    <img alt="CI" src="https://github.com/YASSERRMD/siqlah/actions/workflows/ci.yml/badge.svg">
+  </a>
+  <a href="https://pkg.go.dev/github.com/yasserrmd/siqlah">
+    <img alt="Go Reference" src="https://pkg.go.dev/badge/github.com/yasserrmd/siqlah.svg">
+  </a>
+  <a href="LICENSE">
+    <img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg">
+  </a>
+  <img alt="Go" src="https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white">
+  <img alt="Rust" src="https://img.shields.io/badge/Rust-1.70+-orange?logo=rust&logoColor=white">
+</p>
 
 ---
 
-## Problem Statement
+> **siqlah** (سِقلة) — Arabic: *"polish"* or *"refinement"*. The tool that brings clarity and proof to what was previously opaque: AI token billing.
 
-Every major AI provider — OpenAI, Anthropic, Google, Cohere — reports token counts that directly determine billing. Yet no tool today independently verifies those counts before the invoice is generated. Operators trust a number printed in a JSON response. siqlah closes this gap: it intercepts AI API responses, locally re-tokenizes the text using the same tokenizer the provider uses, signs a cryptographic receipt over both the provider-reported and locally-verified counts, batches receipts into a Merkle log, and allows external witnesses to cosign each checkpoint — producing a publicly auditable, append-only ledger of AI usage that any party can independently verify.
+---
+
+## The Problem
+
+Every major AI provider — OpenAI, Anthropic, Google — prints a token count in their API response. That number directly determines your invoice. Yet **no independent party verifies it**. You trust a JSON field.
+
+siqlah closes this gap:
+
+| Today | With siqlah |
+|---|---|
+| Provider reports tokens; you pay | Provider reports tokens; siqlah re-tokenizes locally and signs both |
+| No audit trail | Append-only Merkle log with inclusion proofs |
+| Single point of trust | k-of-n witness cosigning; any party can verify |
+| Billing disputes require provider cooperation | Cryptographic receipts verifiable offline |
 
 ---
 
 ## Architecture
 
-siqlah is built in four layers:
+<!-- ARCHITECTURE DIAGRAM -->
+<!-- Replace this block with the generated diagram image. See docs/gemini-diagram-prompt.md for the prompt to use with Google AI Studio / Gemini to generate a professional architecture diagram for this system. -->
 
-| Layer | What it does |
-|-------|--------------|
-| **Receipts** | Per-call signed records containing provider-reported counts, locally-verified counts, request/response hashes, and a Merkle root over token boundary byte offsets |
-| **Log** | Append-only SQLite (or ClickHouse/TimescaleDB) store; receipts are batched into Merkle checkpoints with Ed25519 operator signatures |
-| **Witnesses** | Independent cosigners that verify the operator signature and append-only property before adding their own cosignature, providing k-of-n attestation |
-| **Monitor** | Background daemon that re-tokenizes stored receipts and fires alerts when provider-reported counts diverge from locally-verified counts beyond a configurable threshold |
+```
+┌──────────────────────────────────────────────────────┐
+│  Layer 4: Witness Network                             │
+│  Independent parties co-sign checkpoints             │
+│  (Ed25519, C2SP-compatible)                          │
+├──────────────────────────────────────────────────────┤
+│  Layer 3: Checkpoint Log                             │
+│  RFC 6962 Merkle tree over receipt batches           │
+│  Append-only, consistency-provable                   │
+├──────────────────────────────────────────────────────┤
+│  Layer 2: Receipt Store                              │
+│  Signed, canonical VUR records per API call          │
+│  SQLite (dev) / ClickHouse / TimescaleDB (prod)      │
+├──────────────────────────────────────────────────────┤
+│  Layer 1: Provider Adapters                          │
+│  OpenAI · Anthropic · Generic (OpenAI-compatible)    │
+│  Parse raw provider responses into normalized usage  │
+└──────────────────────────────────────────────────────┘
+```
+
+> **Generate a visual diagram:** Use the prompt in [`docs/gemini-diagram-prompt.md`](docs/gemini-diagram-prompt.md) with [Google AI Studio](https://aistudio.google.com) to produce a publication-quality architecture diagram. Replace the ASCII block above with the result.
+
+See [`docs/architecture.md`](docs/architecture.md) for the full four-layer design, data flow, and threat model.
 
 ---
 
-## Quick Start (Docker)
+## How It Works
+
+### 1 · Ingest
+
+When your application calls an AI API, forward the raw response body to siqlah:
+
+```
+POST /v1/receipts   { provider, tenant, model, response_body }
+```
+
+siqlah parses token counts, re-tokenizes locally via the Rust engine, hashes the raw bytes, and returns a signed **VUR Receipt** — an Ed25519-signed canonical JSON record containing both the provider-reported and locally-verified counts.
+
+### 2 · Checkpoint
+
+Every N receipts (or on a timer), siqlah builds a Merkle root over all canonical receipt bytes, signs a `SignedPayload`, and persists a **Checkpoint**. Each checkpoint embeds the previous root, forming an append-only hash chain.
+
+### 3 · Witness
+
+Independent witnesses fetch each checkpoint, verify the operator signature, and co-sign with their own Ed25519 key. Clients configure which witnesses they trust and how many cosignatures are required (k-of-n).
+
+### 4 · Verify
+
+Anyone with the operator's public key can:
+- Verify any receipt's Ed25519 signature offline
+- Obtain a Merkle inclusion proof (`GET /v1/receipts/{id}/proof`) and verify it without trusting the server
+- Obtain a consistency proof between two checkpoints to prove the log has not been rewritten
+
+---
+
+## Quick Start
+
+### Docker (Recommended)
 
 ```bash
-git clone https://github.com/yasserrmd/siqlah
+git clone https://github.com/YASSERRMD/siqlah
 cd siqlah/deployments
 
-# Start the main service + two auto-cosigning witnesses
+# Start main service + two auto-cosigning witnesses
 docker compose up -d
 
-# Ingest a usage event
-curl -X POST http://localhost:8080/v1/receipts \
-  -H "Content-Type: application/json" \
-  -d '{
-    "provider": "openai",
-    "tenant": "my-org",
-    "model": "gpt-4o",
-    "response_body": "{\"usage\":{\"prompt_tokens\":150,\"completion_tokens\":45}}"
-  }'
-
-# Trigger a checkpoint
-curl -X POST http://localhost:8080/v1/checkpoints/build
-
-# Verify the checkpoint
-curl http://localhost:8080/v1/checkpoints/1/verify
-
-# Check stats
-curl http://localhost:8080/v1/stats
+# Health check
+curl http://localhost:8080/v1/health
 ```
 
----
+### Build from Source
 
-## Building from Source
-
-**Requirements:** Go 1.22+, Rust 1.75+ (for tokenizer engine), Docker (optional)
+**Requirements:** Go 1.21+, Rust 1.70+, `gcc`/`clang` (CGo for tokenizer FFI)
 
 ```bash
-# Build the Rust tokenizer engine
-make build-tokenizer
+git clone https://github.com/YASSERRMD/siqlah
+cd siqlah
 
-# Build all Go binaries
-make build
-
-# Run tests
-make test
-
-# Lint
-make lint
+make build        # build all binaries (Rust tokenizer + Go)
+make test         # run full test suite
 ```
 
-Binaries produced:
-- `bin/siqlah` — main service
-- `bin/witness` — witness CLI (keygen, cosign, verify, watch)
-- `bin/verifier` — client-side verifier CLI
+Binaries produced in `bin/`:
+
+| Binary | Purpose |
+|---|---|
+| `siqlah` | Main API server |
+| `siqlah-witness` | Witness CLI: `keygen`, `cosign`, `verify`, `watch` |
+| `siqlah-verifier` | Client verifier: receipt verify, inclusion proof, reconcile |
+
+### First Receipt in 60 Seconds
+
+```bash
+# 1. Generate operator key
+./bin/siqlah-witness keygen --out operator.key
+
+# 2. Start server
+./bin/siqlah --operator-key ./operator.key --db ./siqlah.db --addr :8080
+
+# 3. Ingest an OpenAI response
+curl -X POST http://localhost:8080/v1/receipts \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "provider": "openai",
+    "tenant": "acme",
+    "model": "gpt-4o",
+    "response_body": {
+      "id": "chatcmpl-abc123",
+      "usage": {"prompt_tokens": 150, "completion_tokens": 75}
+    }
+  }'
+
+# 4. Build a checkpoint
+curl -X POST http://localhost:8080/v1/checkpoints/build
+
+# 5. Verify
+curl http://localhost:8080/v1/checkpoints/1/verify
+```
+
+See [`docs/quickstart.md`](docs/quickstart.md) for the full 5-minute tutorial including witness setup and local proof verification.
 
 ---
 
-## Provider Adapters
+## Supported Providers
 
-| Provider | Adapter | Token Fields |
-|----------|---------|--------------|
-| OpenAI | `openai` | `prompt_tokens`, `completion_tokens`, `reasoning_tokens` |
-| Anthropic | `anthropic` | `input_tokens`, `output_tokens`, cache fields |
-| OpenAI-compatible | `generic` | Works with Ollama, vLLM, llama.cpp, LiteLLM |
+| Provider | `provider` value | Notes |
+|---|---|---|
+| OpenAI | `openai` | `o1`/`o3` reasoning tokens via `completion_tokens_details` |
+| Anthropic | `anthropic` | Cache creation and cache read token fields |
+| OpenAI-compatible | `generic` | Ollama, vLLM, LiteLLM, llama.cpp |
 
 ---
 
-## How Verification Works
+## API Overview
 
-1. **Per-call**: siqlah calls the Rust tokenizer (HuggingFace `tokenizers` crate) to re-count tokens in the request/response text, recording boundary byte offsets into a Merkle tree. The operator signs a receipt containing both the provider-reported count and the locally-verified count.
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/receipts` | Ingest a single API response |
+| `POST` | `/v1/receipts/batch` | Ingest multiple responses |
+| `GET` | `/v1/receipts/{id}` | Fetch a receipt by UUID |
+| `GET` | `/v1/receipts/{id}/proof` | Merkle inclusion proof |
+| `POST` | `/v1/checkpoints/build` | Build and sign a checkpoint |
+| `GET` | `/v1/checkpoints` | List checkpoints (paginated) |
+| `GET` | `/v1/checkpoints/{id}/verify` | Verify operator sig + witness cosigs |
+| `POST` | `/v1/checkpoints/{id}/witness` | Submit a witness cosignature |
+| `GET` | `/v1/checkpoints/{id}/consistency/{old_id}` | Consistency proof between checkpoints |
+| `GET` | `/v1/health` | Liveness probe |
+| `GET` | `/v1/stats` | Aggregate counts |
 
-2. **Checkpoint**: Every N receipts (default: 1000) or every T seconds (default: 30s), siqlah builds a Merkle root over all receipt canonical bytes, signs a checkpoint payload, and persists it. The chain of checkpoints forms an append-only log: each checkpoint embeds the previous root.
+Full reference: [`docs/api.md`](docs/api.md)
 
-3. **Witness cosigning**: External witnesses fetch each checkpoint, verify the operator signature, verify that the new root is consistent with the old one (using a Merkle consistency proof), and add their own Ed25519 cosignature. A checkpoint is considered fully attested when k-of-n configured witnesses have cosigned.
+---
 
-4. **Client verification**: The `verifier` CLI can fetch an inclusion proof for any receipt, verify it against the checkpoint Merkle root, and independently re-run the tokenizer to confirm the count recorded in the receipt.
+## Security & Threat Model
+
+| Threat | Mitigation |
+|---|---|
+| Provider inflates token counts | Rust tokenizer re-verifies locally; discrepancy monitor alerts |
+| Operator inflates token counts | Ed25519 signature binds counts at signing time; client verifies |
+| Log tampered after the fact | RFC 6962 Merkle inclusion and consistency proofs; witness cosignatures |
+| Single-operator trust | Witness network; k-of-n cosigning; public audit log |
+| Replay attacks | Unique receipt UUID; timestamp in signed payload |
+| Key compromise | Checkpoint chain breaks; detectable; witness network provides redundancy |
+
+---
+
+## Documentation
+
+| Document | Description |
+|---|---|
+| [`docs/quickstart.md`](docs/quickstart.md) | 5-minute tutorial |
+| [`docs/api.md`](docs/api.md) | Full API reference |
+| [`docs/architecture.md`](docs/architecture.md) | Four-layer design, data flow, threat model |
+| [`docs/receipt-spec.md`](docs/receipt-spec.md) | VUR receipt format and canonical serialization spec |
+| [`docs/witness-protocol.md`](docs/witness-protocol.md) | Witness verification and cosigning protocol |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development guide |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release history |
+
+---
+
+## Comparison
+
+| Approach | Trust Model | Verifiability | Token-Level |
+|---|---|---|---|
+| **siqlah** | Multi-party witness, Ed25519 | Cryptographic inclusion proofs | Yes (Rust FFI) |
+| Hyperledger Fabric | Permissioned blockchain | On-chain audit | No |
+| x402 (HTTP payment) | Blockchain settlement | Payment proof only | No |
+| ZKML | ZK proofs of inference | Strong but expensive | Yes (heavy) |
+| Provider billing APIs | Trust provider | None | No |
+
+siqlah occupies the pragmatic middle ground: cryptographically strong, operationally simple, no blockchain required.
 
 ---
 
 ## License
 
-Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
+Apache License, Version 2.0. See [LICENSE](LICENSE).
 
-Copyright 2026 Mohamed Yasser (YASSERRMD)
+Copyright 2026 [YASSERRMD](https://github.com/YASSERRMD)
