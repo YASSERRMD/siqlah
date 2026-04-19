@@ -10,6 +10,63 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). siq
 
 ### Added
 
+**Phase 23 — Tests, Migration & Interop Docs**
+- SQLite-to-Tessera migration subcommand (`siqlah migrate`) with batch processing, dry-run mode, and idempotent append
+- v2 end-to-end integration tests (`test/e2e_v2_test.go`): Ed25519 signer interface, sign/verify round-trip, health/version, ingest→checkpoint, batch ingest, witness submit
+- Backward-compatibility tests (`test/compat_test.go`): v1 receipt deserialization, v1.1 Fulcio field round-trip, canonical JSON field order and stability, optional field omission
+- Tessera benchmark suite (`test/bench_tessera_test.go`): AppendReceipt, parallel append, GetReceiptByID, FetchUnbatched
+- Migration guide (`docs/migration-v0.1-to-v0.2.md`) — step-by-step upgrade path, schema changes, rollback procedure
+- Interoperability reference (`docs/interop.md`) — C2SP signed note, Sigstore bundle, Rekor v2, x402, provider adapter interface
+
+**Phase 22 — x402 Payment Bridge**
+- `internal/x402` package implementing the HTTP 402 Payment Required protocol
+- `PaymentRequired`, `PaymentScheme`, `PaymentAuthorization`, `PaymentResponse` types
+- `Bridge` — in-memory payment store with structural verification (`VerifyPaymentAuth`)
+- `PaymentMiddleware` — gates handlers behind `X-Payment` header (base64 JSON)
+- `POST /v1/receipts/with-payment` — receipt creation requiring payment authorization
+- `GET /v1/receipts/{id}/payment` — retrieve `PaymentResponse` for a paid receipt
+- 13 unit tests covering all x402 types, middleware, and header extraction
+
+**Phase 21 — Energy-Per-Token Reporting**
+- `internal/energy.BenchmarkEstimator` with per-model J/token figures for 16 popular models (GPT-4o, Claude, Llama, Gemini, Mistral)
+- `internal/energy.StaticCarbonLookup` with Electricity Maps 2024 annual averages for ~30 cloud regions, global fallback
+- Energy fields added to receipt schema (`energy_estimate_joules`, `energy_source`, `carbon_intensity_gco2e_per_kwh`, `inference_region`) and canonical bytes
+- `--inference-region` flag for carbon intensity lookup
+- `GET /v1/stats/energy` endpoint — operator energy configuration
+- 8 unit tests for estimator, carbon lookup, and conversion formula
+
+**Phase 20 — Rekor Transparency Log Anchoring**
+- `internal/anchor.RekorAnchor` — ECDSA P-256 ephemeral key, `hashedrekord` entries via Rekor v2 REST API
+- `internal/anchor.AnchorScheduler` — background goroutine anchoring each new checkpoint at most once
+- `rekor_log_index` column in checkpoints table (idempotent migration, default `-1`)
+- `UpdateCheckpointRekorIndex` on `Store` interface
+- Checkpoint verify response now includes `rekor_anchored`, `rekor_log_index`, `rekor_entry_url`
+
+**Phase 19 — OMS Model Identity Verification**
+- `internal/model.VerifyModelIdentity` — Go implementation of Sigstore bundle v0.3 verification (ECDSA P-256, SHA-256, URI SAN)
+- `internal/model.Registry` — thread-safe registry with 13 pre-loaded well-known models
+- Receipt schema extended with `model_signer_identity`, `model_signature_verified`
+- `populateModelIdentity` in ingest — verifies OMS bundle if provided, falls back to registry, degrades gracefully
+
+**Phase 18 — C2SP Witness Protocol**
+- `internal/witness` package: C2SP checkpoint format, signed note verification, cosignature accumulation
+- `GET /v1/witness/checkpoint` — latest signed note in C2SP format
+- `POST /v1/witness/cosign` — submit witness cosignature
+- `GET /v1/witness/cosigned-checkpoint` — fully cosigned note
+
+**Phase 17 — Fulcio Keyless Signing**
+- `internal/signing` package with `Signer` interface, `Ed25519Signer`, `FulcioSigner`
+- `FulcioVerifier` — verifies Fulcio-signed receipts against a trust root
+- Receipt schema extended with `signer_type`, `certificate_pem`, `rekor_log_index`
+- `--signing-backend` flag (`ed25519` or `fulcio`), `--fulcio-url`, `--oidc-issuer`
+
+**Phase 16 — Tessera Append-Only Log**
+- `internal/tessera` package wrapping the transparency-dev/tessera POSIX backend
+- `TesseraStore` composing SQLite with Tessera for Merkle-log operations
+- `--log-backend=tessera` flag, `--tessera-storage-path`, `--tessera-log-name`
+- Tessera-backed inclusion and consistency proofs
+- `GET /v1/log/checkpoint` — raw C2SP signed note from Tessera
+
 **Phase 15 — Documentation & CI**
 - Architecture document (`docs/architecture.md`) with four-layer diagram, data flow, threat model, and comparison with related approaches
 - API reference (`docs/api.md`) with every endpoint, request/response schemas, error codes, and curl examples
