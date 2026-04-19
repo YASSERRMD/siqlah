@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+  siqlah:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    image: siqlah:latest
+    container_name: siqlah
+    ports:
+      - "8080:8080"
+    volumes:
+      - siqlah-data:/data
+    environment:
+      SIQLAH_ADDR: ":8080"
+      SIQLAH_DB: "/data/siqlah.db"
+      SIQLAH_BATCH_INTERVAL: "30s"
+      SIQLAH_MAX_BATCH: "1000"
+      SIQLAH_MONITOR: "true"
+      SIQLAH_DISCREPANCY_THRESHOLD: "5.0"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    command: server
+
+  witness-1:
+    image: siqlah:latest
+    container_name: siqlah-witness-1
+    depends_on:
+      siqlah:
+        condition: service_healthy
+    volumes:
+      - witness1-data:/data
+    environment:
+      SIQLAH_LEDGER_URL: "http://siqlah:8080"
+      SIQLAH_OPERATOR_PUB: "${SIQLAH_OPERATOR_PUB}"
+      WITNESS_ID: "witness-1"
+      WITNESS_KEY_FILE: "/data/witness.key"
+      WITNESS_INTERVAL: "30s"
+    restart: unless-stopped
+    command: witness
+
+  witness-2:
+    image: siqlah:latest
+    container_name: siqlah-witness-2
+    depends_on:
+      siqlah:
+        condition: service_healthy
+    volumes:
+      - witness2-data:/data
+    environment:
+      SIQLAH_LEDGER_URL: "http://siqlah:8080"
+      SIQLAH_OPERATOR_PUB: "${SIQLAH_OPERATOR_PUB}"
+      WITNESS_ID: "witness-2"
+      WITNESS_KEY_FILE: "/data/witness.key"
+      WITNESS_INTERVAL: "30s"
+    restart: unless-stopped
+    command: witness
+
+volumes:
+  siqlah-data:
+  witness1-data:
+  witness2-data:

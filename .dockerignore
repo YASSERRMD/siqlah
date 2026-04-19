@@ -1,0 +1,9 @@
+.git
+.gitignore
+*.db
+bin/
+tmp/
+docs/
+test/
+*.md
+tokenizer-rs/target/
