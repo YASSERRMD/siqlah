@@ -27,10 +27,10 @@ Cargo.lock
 *.swo
 *.DS_Store
 
-# Binaries
-siqlah
-witness
-verifier
+# Binaries (root-level only)
+/siqlah
+/witness
+/verifier
 
 # Temp
 tmp/
