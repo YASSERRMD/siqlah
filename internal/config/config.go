@@ -38,6 +38,11 @@ type Config struct {
 	RekorAnchor         bool          `json:"rekor_anchor"`          // enable anchoring (default false)
 	RekorURL            string        `json:"rekor_url"`             // Rekor endpoint
 	RekorAnchorInterval time.Duration `json:"rekor_anchor_interval"` // default 24h
+
+	// Push-based witness feeder
+	WitnessFeed         bool          `json:"witness_feed"`          // enable push feeder (default false)
+	WitnessURLs         string        `json:"witness_urls"`          // comma-separated external witness URLs
+	WitnessFeedInterval time.Duration `json:"witness_feed_interval"` // default 60s
 }
 
 // rawConfig mirrors Config with duration fields as strings for JSON parsing.
@@ -59,9 +64,12 @@ type rawConfig struct {
 	OIDCIssuer           string  `json:"oidc_issuer"`
 	OIDCClientID         string  `json:"oidc_client_id"`
 	FulcioURL            string  `json:"fulcio_url"`
-	RekorAnchor          bool    `json:"rekor_anchor"`
-	RekorURL             string  `json:"rekor_url"`
-	RekorAnchorInterval  string  `json:"rekor_anchor_interval"`
+	RekorAnchor          bool   `json:"rekor_anchor"`
+	RekorURL             string `json:"rekor_url"`
+	RekorAnchorInterval  string `json:"rekor_anchor_interval"`
+	WitnessFeed          bool   `json:"witness_feed"`
+	WitnessURLs          string `json:"witness_urls"`
+	WitnessFeedInterval  string `json:"witness_feed_interval"`
 }
 
 // Defaults returns a Config populated with default values matching the CLI flags.
@@ -83,6 +91,8 @@ func Defaults() Config {
 		RekorAnchor:         false,
 		RekorURL:            "https://rekor.sigstore.dev",
 		RekorAnchorInterval: 24 * time.Hour,
+		WitnessFeed:         false,
+		WitnessFeedInterval: 60 * time.Second,
 	}
 }
 
@@ -168,6 +178,17 @@ func Load(path string) (*Config, error) {
 			return nil, fmt.Errorf("rekor_anchor_interval: %w", err)
 		}
 		cfg.RekorAnchorInterval = d
+	}
+	cfg.WitnessFeed = raw.WitnessFeed
+	if raw.WitnessURLs != "" {
+		cfg.WitnessURLs = raw.WitnessURLs
+	}
+	if raw.WitnessFeedInterval != "" {
+		d, err := time.ParseDuration(raw.WitnessFeedInterval)
+		if err != nil {
+			return nil, fmt.Errorf("witness_feed_interval: %w", err)
+		}
+		cfg.WitnessFeedInterval = d
 	}
 
 	return &cfg, nil

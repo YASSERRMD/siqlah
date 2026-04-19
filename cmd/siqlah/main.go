@@ -23,6 +23,7 @@ import (
 	"github.com/yasserrmd/siqlah/internal/provider"
 	"github.com/yasserrmd/siqlah/internal/signing"
 	"github.com/yasserrmd/siqlah/internal/store"
+	"github.com/yasserrmd/siqlah/internal/witness"
 )
 
 var (
@@ -58,6 +59,9 @@ func main() {
 	rekorAnchor := flag.Bool("rekor-anchor", false, "enable periodic Rekor public anchoring")
 	rekorInterval := flag.Duration("rekor-anchor-interval", 24*time.Hour, "interval between Rekor anchoring attempts")
 	inferenceRegion := flag.String("inference-region", "", "cloud region where inference runs (e.g. us-east-1) for carbon reporting")
+	witnessFeed := flag.Bool("witness-feed", false, "enable push-based witness feeder")
+	witnessURLs := flag.String("witness-urls", "", "comma-separated external witness HTTP endpoints")
+	witnessFeedInterval := flag.Duration("witness-feed-interval", 60*time.Second, "how often to push checkpoints to external witnesses")
 	flag.Parse()
 
 	_, _ = *oidcClientID, *oidcIssuer // surfaced for future integration
@@ -164,6 +168,23 @@ func main() {
 		sched := anchor.NewAnchorScheduler(ra, st, *rekorInterval)
 		go sched.Run(ctx)
 		log.Printf("rekor anchoring enabled: %s every %s", *rekorURL, *rekorInterval)
+	}
+
+	// Optionally start push-based witness feeder.
+	if *witnessFeed && *witnessURLs != "" {
+		urls := strings.Split(*witnessURLs, ",")
+		var extWitnesses []witness.ExternalWitness
+		for _, u := range urls {
+			u = strings.TrimSpace(u)
+			if u != "" {
+				extWitnesses = append(extWitnesses, witness.ExternalWitness{Name: u, URL: u})
+			}
+		}
+		if len(extWitnesses) > 0 {
+			lr := witness.NewStoreLogReader(st)
+			feeder := witness.NewWitnessFeeder(lr, extWitnesses, *witnessFeedInterval)
+			go feeder.Run(ctx)
+		}
 	}
 
 	// Optionally start discrepancy monitor.

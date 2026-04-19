@@ -3,6 +3,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
@@ -13,7 +14,10 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/yasserrmd/siqlah/internal/checkpoint"
@@ -36,6 +40,8 @@ func main() {
 		err = runVerify(os.Args[2:])
 	case "watch":
 		err = runWatch(os.Args[2:])
+	case "feed":
+		err = runFeed(os.Args[2:])
 	default:
 		usage()
 		os.Exit(1)
@@ -56,7 +62,10 @@ Subcommands:
   verify --ledger URL --op-pub HEX [--origin STR] [--threshold N] [--legacy --cp ID]
                                           Verify a checkpoint's operator and witness signatures
   watch  --ledger URL --op-pub HEX --key PATH [--origin STR] [--interval DURATION]
-                                          Continuously watch for new checkpoints and auto-cosign (C2SP)`)
+                                          Continuously watch for new checkpoints and auto-cosign (C2SP)
+  feed   --ledger URL --witness-urls URL1,URL2 [--interval DURATION]
+                                          Push-based feeder: fetch checkpoints from ledger and push
+                                          to external tlog-witness compatible witnesses`)
 }
 
 // --- keygen ---
@@ -323,6 +332,79 @@ func runWatch(args []string) error {
 		}
 		time.Sleep(*interval)
 	}
+}
+
+// --- feed ---
+
+func runFeed(args []string) error {
+	fs := flag.NewFlagSet("feed", flag.ContinueOnError)
+	ledger := fs.String("ledger", "", "siqlah server URL (required)")
+	witnessURLs := fs.String("witness-urls", "", "comma-separated external witness URLs (required)")
+	interval := fs.Duration("interval", 60*time.Second, "polling interval")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *ledger == "" || *witnessURLs == "" {
+		fs.Usage()
+		return errors.New("--ledger and --witness-urls are required")
+	}
+
+	urls := strings.Split(*witnessURLs, ",")
+	var extWitnesses []witness.ExternalWitness
+	for _, u := range urls {
+		u = strings.TrimSpace(u)
+		if u != "" {
+			extWitnesses = append(extWitnesses, witness.ExternalWitness{Name: u, URL: u})
+		}
+	}
+	if len(extWitnesses) == 0 {
+		return errors.New("no valid witness URLs provided")
+	}
+
+	lr := &ledgerLogReader{baseURL: *ledger}
+	feeder := witness.NewWitnessFeeder(lr, extWitnesses, *interval)
+
+	fmt.Printf("feeding %s → %d witness(es) every %s\n", *ledger, len(extWitnesses), *interval)
+	ctx := signalContext()
+	feeder.Run(ctx)
+	return nil
+}
+
+// ledgerLogReader fetches checkpoints from a remote siqlah ledger.
+type ledgerLogReader struct {
+	baseURL string
+}
+
+func (l *ledgerLogReader) LatestCheckpoint() ([]byte, error) {
+	resp, err := http.Get(l.baseURL + "/v1/witness/checkpoint")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("server %d: %s", resp.StatusCode, b)
+	}
+	return io.ReadAll(resp.Body)
+}
+
+func (l *ledgerLogReader) ConsistencyProof(oldSize, newSize uint64) ([][]byte, error) {
+	// Ledger-based feeder delegates consistency proof fetching to the internal store
+	// via the server. For external feeders, we send without a proof (oldSize == 0)
+	// and let the witness request a re-feed if needed.
+	return nil, nil
+}
+
+// signalContext returns a context that is cancelled on SIGINT/SIGTERM.
+func signalContext() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+		<-ch
+		cancel()
+	}()
+	return ctx
 }
 
 // --- HTTP helpers (legacy) ---
