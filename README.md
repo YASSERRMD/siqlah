@@ -353,6 +353,7 @@ See [`docs/migration-v0.1-to-v0.2.md`](docs/migration-v0.1-to-v0.2.md) for the s
 | [`docs/migration-v0.1-to-v0.2.md`](docs/migration-v0.1-to-v0.2.md) | SQLite → Tessera upgrade guide and rollback |
 | [`docs/interop.md`](docs/interop.md) | C2SP, Sigstore bundle, Rekor v2, x402 interoperability reference |
 | [`docs/docker.md`](docs/docker.md) | Docker and Docker Compose deployment guide |
+| [`docs/attestation.md`](docs/attestation.md) | In-toto/SLSA attestation — cosign, GUAC, and OPA integration |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development guide |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history |
 
@@ -360,13 +361,13 @@ See [`docs/migration-v0.1-to-v0.2.md`](docs/migration-v0.1-to-v0.2.md) for the s
 
 ## Comparison
 
-| Approach | Trust Model | Verifiability | Token-Level | Keyless Signing | Carbon Reporting |
-|---|---|---|---|---|---|
-| **siqlah** | Multi-party witness, Ed25519/Fulcio | Cryptographic inclusion proofs | Yes (Rust FFI) | Yes (Fulcio) | Yes |
-| Hyperledger Fabric | Permissioned blockchain | On-chain audit | No | No | No |
-| x402 (HTTP payment) | Blockchain settlement | Payment proof only | No | No | No |
-| ZKML | ZK proofs of inference | Strong but expensive | Yes (heavy) | No | No |
-| Provider billing APIs | Trust provider | None | No | No | No |
+| Approach | Trust Model | Verifiability | Token-Level | Keyless Signing | Carbon Reporting | Ecosystem Interop |
+|---|---|---|---|---|---|---|
+| **siqlah** | Multi-party witness, Ed25519/Fulcio | Cryptographic inclusion proofs | Yes (Rust FFI) | Yes (Fulcio) | Yes | Sigstore, C2SP, Armored Witness, in-toto/SLSA |
+| Hyperledger Fabric | Permissioned blockchain | On-chain audit | No | No | No | None |
+| x402 (HTTP payment) | Blockchain settlement | Payment proof only | No | No | No | None |
+| ZKML | ZK proofs of inference | Strong but expensive | Yes (heavy) | No | No | None |
+| Provider billing APIs | Trust provider | None | No | No | No | None |
 
 siqlah occupies the pragmatic middle ground: cryptographically strong, operationally simple, no blockchain required.
 
