@@ -12,8 +12,12 @@ CARGO := cargo
 DOCKER := docker
 DOCKER_COMPOSE := docker compose
 
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+LDFLAGS := -ldflags "-X main.version=$(VERSION) -X main.commitSHA=$(COMMIT)"
+
 build: $(BINARY_DIR)
-	$(GO) build -o $(SIQLAH_BIN) ./cmd/siqlah
+	$(GO) build $(LDFLAGS) -o $(SIQLAH_BIN) ./cmd/siqlah
 	$(GO) build -o $(WITNESS_BIN) ./cmd/witness
 	$(GO) build -o $(VERIFIER_BIN) ./cmd/verifier
 
