@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="280" viewBox="0 0 1200 280">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d1117;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#161b22;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3fb950;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#58a6ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a371f7;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#e6edf3;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b949e;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="nodeglow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="280" fill="url(#bg)" rx="12"/>
+
+  <!-- Subtle grid lines -->
+  <g stroke="#21262d" stroke-width="0.5" opacity="0.6">
+    <line x1="0" y1="70" x2="1200" y2="70"/>
+    <line x1="0" y1="140" x2="1200" y2="140"/>
+    <line x1="0" y1="210" x2="1200" y2="210"/>
+    <line x1="300" y1="0" x2="300" y2="280"/>
+    <line x1="600" y1="0" x2="600" y2="280"/>
+    <line x1="900" y1="0" x2="900" y2="280"/>
+  </g>
+
+  <!-- Merkle tree diagram (right side) -->
+  <!-- Root node -->
+  <circle cx="1050" cy="80" r="10" fill="none" stroke="#58a6ff" stroke-width="1.5" filter="url(#nodeglow)" opacity="0.9"/>
+  <circle cx="1050" cy="80" r="4" fill="#58a6ff" opacity="0.8"/>
+
+  <!-- Level 1 nodes -->
+  <circle cx="990" cy="140" r="8" fill="none" stroke="#3fb950" stroke-width="1.5" opacity="0.8"/>
+  <circle cx="990" cy="140" r="3" fill="#3fb950" opacity="0.7"/>
+  <circle cx="1110" cy="140" r="8" fill="none" stroke="#3fb950" stroke-width="1.5" opacity="0.8"/>
+  <circle cx="1110" cy="140" r="3" fill="#3fb950" opacity="0.7"/>
+
+  <!-- Level 2 nodes -->
+  <circle cx="960" cy="195" r="6" fill="none" stroke="#a371f7" stroke-width="1.5" opacity="0.7"/>
+  <circle cx="960" cy="195" r="2.5" fill="#a371f7" opacity="0.6"/>
+  <circle cx="1020" cy="195" r="6" fill="none" stroke="#a371f7" stroke-width="1.5" opacity="0.7"/>
+  <circle cx="1020" cy="195" r="2.5" fill="#a371f7" opacity="0.6"/>
+  <circle cx="1080" cy="195" r="6" fill="none" stroke="#a371f7" stroke-width="1.5" opacity="0.7"/>
+  <circle cx="1080" cy="195" r="2.5" fill="#a371f7" opacity="0.6"/>
+  <circle cx="1140" cy="195" r="6" fill="none" stroke="#a371f7" stroke-width="1.5" opacity="0.7"/>
+  <circle cx="1140" cy="195" r="2.5" fill="#a371f7" opacity="0.6"/>
+
+  <!-- Leaf nodes -->
+  <rect x="946" y="237" width="8" height="8" rx="1" fill="none" stroke="#e3b341" stroke-width="1" opacity="0.6"/>
+  <rect x="968" y="237" width="8" height="8" rx="1" fill="none" stroke="#e3b341" stroke-width="1" opacity="0.6"/>
+  <rect x="1006" y="237" width="8" height="8" rx="1" fill="none" stroke="#e3b341" stroke-width="1" opacity="0.6"/>
+  <rect x="1028" y="237" width="8" height="8" rx="1" fill="none" stroke="#e3b341" stroke-width="1" opacity="0.6"/>
+  <rect x="1066" y="237" width="8" height="8" rx="1" fill="none" stroke="#e3b341" stroke-width="1" opacity="0.6"/>
+  <rect x="1088" y="237" width="8" height="8" rx="1" fill="none" stroke="#e3b341" stroke-width="1" opacity="0.6"/>
+  <rect x="1126" y="237" width="8" height="8" rx="1" fill="none" stroke="#e3b341" stroke-width="1" opacity="0.6"/>
+  <rect x="1148" y="237" width="8" height="8" rx="1" fill="none" stroke="#e3b341" stroke-width="1" opacity="0.6"/>
+
+  <!-- Tree edges -->
+  <g stroke="#30363d" stroke-width="1" opacity="0.7">
+    <line x1="1050" y1="90" x2="990" y2="132"/>
+    <line x1="1050" y1="90" x2="1110" y2="132"/>
+    <line x1="990" y1="148" x2="960" y2="189"/>
+    <line x1="990" y1="148" x2="1020" y2="189"/>
+    <line x1="1110" y1="148" x2="1080" y2="189"/>
+    <line x1="1110" y1="148" x2="1140" y2="189"/>
+    <line x1="960" y1="201" x2="950" y2="237"/>
+    <line x1="960" y1="201" x2="972" y2="237"/>
+    <line x1="1020" y1="201" x2="1010" y2="237"/>
+    <line x1="1020" y1="201" x2="1032" y2="237"/>
+    <line x1="1080" y1="201" x2="1070" y2="237"/>
+    <line x1="1080" y1="201" x2="1092" y2="237"/>
+    <line x1="1140" y1="201" x2="1130" y2="237"/>
+    <line x1="1140" y1="201" x2="1152" y2="237"/>
+  </g>
+
+  <!-- "Merkle Root" label -->
+  <text x="1050" y="68" text-anchor="middle" font-family="'SF Mono', 'Fira Code', monospace" font-size="9" fill="#58a6ff" opacity="0.7">root</text>
+
+  <!-- Vertical separator -->
+  <line x1="920" y1="30" x2="920" y2="250" stroke="#21262d" stroke-width="1" opacity="0.8"/>
+
+  <!-- Accent bar at top -->
+  <rect x="0" y="0" width="1200" height="3" rx="0" fill="url(#accent)"/>
+
+  <!-- Main logo/title area -->
+  <!-- Arabic letter shin / receipt icon stylized -->
+  <g transform="translate(72, 90)" filter="url(#glow)">
+    <!-- Stylized "S" shield -->
+    <path d="M0,0 L48,0 L48,60 Q48,80 24,90 Q0,80 0,60 Z" fill="none" stroke="url(#accent)" stroke-width="2" opacity="0.6"/>
+    <path d="M12,28 Q12,18 24,18 Q36,18 36,28 Q36,38 24,38 Q18,38 14,44 Q10,50 14,56 Q18,62 24,62 Q30,62 34,58" fill="none" stroke="#58a6ff" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Title -->
+  <text x="150" y="138" font-family="'SF Pro Display', 'Segoe UI', system-ui, sans-serif" font-size="72" font-weight="700" fill="url(#titleGrad)" letter-spacing="-2">siqlah</text>
+
+  <!-- Accent underline -->
+  <rect x="150" y="152" width="320" height="3" rx="1.5" fill="url(#accent)" opacity="0.8"/>
+
+  <!-- Tagline -->
+  <text x="150" y="210" font-family="'SF Pro Text', 'Segoe UI', system-ui, sans-serif" font-size="18" fill="#c9d1d9" font-weight="400">Cryptographic accountability for AI API billing</text>
+
+  <!-- Feature pills -->
+  <g transform="translate(150, 230)">
+    <!-- Ed25519 -->
+    <rect x="0" y="0" width="82" height="22" rx="11" fill="#161b22" stroke="#3fb950" stroke-width="1" opacity="0.9"/>
+    <text x="41" y="15" text-anchor="middle" font-family="'SF Mono', 'Fira Code', monospace" font-size="10" fill="#3fb950">Ed25519</text>
+
+    <!-- Merkle -->
+    <rect x="90" y="0" width="100" height="22" rx="11" fill="#161b22" stroke="#58a6ff" stroke-width="1" opacity="0.9"/>
+    <text x="140" y="15" text-anchor="middle" font-family="'SF Mono', 'Fira Code', monospace" font-size="10" fill="#58a6ff">RFC 6962 Merkle</text>
+
+    <!-- Witness -->
+    <rect x="198" y="0" width="116" height="22" rx="11" fill="#161b22" stroke="#a371f7" stroke-width="1" opacity="0.9"/>
+    <text x="256" y="15" text-anchor="middle" font-family="'SF Mono', 'Fira Code', monospace" font-size="10" fill="#a371f7">C2SP Witnesses</text>
+
+    <!-- in-toto -->
+    <rect x="322" y="0" width="96" height="22" rx="11" fill="#161b22" stroke="#e3b341" stroke-width="1" opacity="0.9"/>
+    <text x="370" y="15" text-anchor="middle" font-family="'SF Mono', 'Fira Code', monospace" font-size="10" fill="#e3b341">in-toto SLSA</text>
+  </g>
+
+  <!-- Go + Rust badges area -->
+  <g transform="translate(150, 50)">
+    <rect x="0" y="0" width="48" height="22" rx="4" fill="#00ADD8" opacity="0.15"/>
+    <rect x="0" y="0" width="48" height="22" rx="4" fill="none" stroke="#00ADD8" stroke-width="1" opacity="0.5"/>
+    <text x="24" y="15" text-anchor="middle" font-family="'SF Mono', 'Fira Code', monospace" font-size="11" font-weight="600" fill="#00ADD8">Go</text>
+
+    <rect x="56" y="0" width="52" height="22" rx="4" fill="#CE422B" opacity="0.15"/>
+    <rect x="56" y="0" width="52" height="22" rx="4" fill="none" stroke="#CE422B" stroke-width="1" opacity="0.5"/>
+    <text x="82" y="15" text-anchor="middle" font-family="'SF Mono', 'Fira Code', monospace" font-size="11" font-weight="600" fill="#CE422B">Rust</text>
+  </g>
+
+  <!-- Bottom accent -->
+  <rect x="0" y="277" width="1200" height="3" rx="0" fill="url(#accent)" opacity="0.4"/>
+</svg>

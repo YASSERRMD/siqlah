@@ -1,6 +1,10 @@
 # siqlah
 
 <p align="center">
+  <img src="assets/banner.svg" alt="siqlah — Cryptographic accountability for AI API billing" width="100%">
+</p>
+
+<p align="center">
   <strong>Cryptographic accountability for AI API billing</strong><br>
   Verifiable Usage Receipts · Ed25519 &amp; Fulcio Keyless Signing · RFC 6962 Merkle Proofs · C2SP Witness Cosigning · Energy &amp; Carbon Reporting · x402 Payment Bridge
 </p>
@@ -13,7 +17,7 @@
     <img alt="Go Reference" src="https://pkg.go.dev/badge/github.com/yasserrmd/siqlah.svg">
   </a>
   <a href="LICENSE">
-    <img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg">
+    <img alt="License" src="https://img.shields.io/badge/license-Polyform%20NC%201.0-orange.svg">
   </a>
   <img alt="Go" src="https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white">
   <img alt="Rust" src="https://img.shields.io/badge/Rust-1.70+-orange?logo=rust&logoColor=white">
