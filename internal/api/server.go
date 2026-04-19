@@ -67,6 +67,9 @@ func (s *Server) Routes() *http.ServeMux {
 	mux.HandleFunc("POST /v1/checkpoints/{id}/witness", s.handleWitnessSubmit)
 	mux.HandleFunc("GET /v1/checkpoints/{id}/consistency/{old_id}", s.handleConsistencyProof)
 
+	// Tessera log routes (available when Tessera backend is configured)
+	mux.HandleFunc("GET /v1/log/checkpoint", s.handleLogCheckpoint)
+
 	// Utility routes
 	mux.HandleFunc("GET /v1/health", s.handleHealth)
 	mux.HandleFunc("GET /v1/stats", s.handleStats)

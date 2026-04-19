@@ -1,5 +1,8 @@
 package merkle
 
+// DEPRECATED: Use Tessera backend for production (--log-backend=tessera).
+// This package is retained for the SQLite legacy backend and testing environments without Tessera.
+
 import "crypto/sha256"
 
 // RFC 6962 domain separation prefixes.

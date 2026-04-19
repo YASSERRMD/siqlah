@@ -40,6 +40,9 @@ func main() {
 	discThreshold := flag.Float64("discrepancy-threshold", 5.0, "discrepancy alert threshold percent")
 	alertWebhook := flag.String("alert-webhook", "", "webhook URL for discrepancy alerts")
 	operatorKeyHex := flag.String("operator-key", "", "hex-encoded Ed25519 private key (generated if empty)")
+	logBackend := flag.String("log-backend", "sqlite", "log backend: sqlite (legacy) or tessera")
+	tesseraPath := flag.String("tessera-storage-path", "./tessera-data/", "POSIX path for Tessera tile storage")
+	tesseraLogName := flag.String("tessera-log-name", "siqlah.dev/log", "C2SP log origin string for Tessera")
 	flag.Parse()
 
 	printBanner()
@@ -64,24 +67,42 @@ func main() {
 	}
 	log.Printf("operator public key: %s", hex.EncodeToString(operatorPub))
 
-	// Open the store.
-	st, err := store.Open(*dbPath)
-	if err != nil {
-		log.Fatalf("open store: %v", err)
+	// Open the store — SQLite (legacy) or Tessera (production).
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var st store.Store
+	var builder interface{ BuildAndSign() (*store.Checkpoint, error) }
+
+	if *logBackend == "tessera" {
+		log.Printf("using Tessera backend at %s", *tesseraPath)
+		ts, err := store.NewTesseraStore(ctx, *dbPath, *tesseraPath, *tesseraLogName, operatorPriv)
+		if err != nil {
+			log.Fatalf("open tessera store: %v", err)
+		}
+		st = ts
+		builder = checkpoint.NewTesseraBuilder(st, operatorPriv, *maxBatch)
+	} else {
+		sqlite, err := store.Open(*dbPath)
+		if err != nil {
+			log.Fatalf("open store: %v", err)
+		}
+		st = sqlite
+		builder = checkpoint.NewBuilder(st, operatorPriv, *maxBatch)
 	}
 	defer st.Close()
 
 	// Parse witness public keys.
 	_ = parseWitnesses(*witnessesFlag)
 
-	// Build the checkpoint builder and API server.
-	builder := checkpoint.NewBuilder(st, operatorPriv, *maxBatch)
+	// Build the API server. The builder is type-asserted to *checkpoint.Builder for the API
+	// (which only needs BuildAndSign for the manual trigger endpoint).
+	var cpBuilder *checkpoint.Builder
+	if b, ok := builder.(*checkpoint.Builder); ok {
+		cpBuilder = b
+	}
 	reg := provider.NewRegistry()
-	srv := api.New(st, builder, operatorPub, operatorPriv, reg, version)
-
-	// Create root context for graceful shutdown.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	srv := api.New(st, cpBuilder, operatorPub, operatorPriv, reg, version)
 
 	// Start periodic batcher.
 	go func() {
