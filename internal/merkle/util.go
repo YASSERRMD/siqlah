@@ -1,19 +1,20 @@
 package merkle
 
-// DEPRECATED: Use Tessera backend for production (--log-backend=tessera).
-// This package is retained for the SQLite legacy backend and testing environments without Tessera.
-
 import (
 	"encoding/hex"
 	"fmt"
 )
 
 // FormatRoot returns the hex-encoded string of a Merkle root.
+//
+// Deprecated: Use the Tessera backend (--log-backend=tessera) for production use.
 func FormatRoot(r [32]byte) string {
 	return hex.EncodeToString(r[:])
 }
 
 // ParseRoot decodes a hex string into a 32-byte Merkle root.
+//
+// Deprecated: Use the Tessera backend (--log-backend=tessera) for production use.
 func ParseRoot(s string) ([32]byte, error) {
 	b, err := hex.DecodeString(s)
 	if err != nil {

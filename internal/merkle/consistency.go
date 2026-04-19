@@ -1,8 +1,5 @@
 package merkle
 
-// DEPRECATED: Use Tessera backend for production (--log-backend=tessera).
-// This package is retained for the SQLite legacy backend and testing environments without Tessera.
-
 import (
 	"errors"
 	"fmt"
@@ -11,6 +8,8 @@ import (
 // ConsistencyProof returns the hashes needed to prove that the tree of oldSize
 // leaves is a prefix of the tree of newSize leaves (RFC 6962 §2.2).
 // Proof elements are ordered inner-to-outer (leaf-level subtrees first).
+//
+// Deprecated: Use the Tessera backend (--log-backend=tessera) for production consistency proofs.
 func ConsistencyProof(oldSize, newSize int, leaves [][32]byte) ([][32]byte, error) {
 	if oldSize <= 0 || newSize <= 0 {
 		return nil, errors.New("tree sizes must be positive")
@@ -50,6 +49,8 @@ func collectConsistency(m, n int, leaves [][32]byte, b bool, proof *[][32]byte) 
 
 // VerifyConsistency checks that oldRoot (tree of oldSize) is a prefix of newRoot
 // (tree of newSize) given the consistency proof.
+//
+// Deprecated: Use the Tessera backend (--log-backend=tessera) for production proof verification.
 func VerifyConsistency(oldRoot, newRoot [32]byte, oldSize, newSize int, proof [][32]byte) bool {
 	if oldSize == newSize {
 		return oldRoot == newRoot && len(proof) == 0

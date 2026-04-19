@@ -224,6 +224,8 @@ Fulcio-signed receipts include a `certificate_pem` field and optionally a `rekor
 | SQLite (default) | `sqlite` | Single-file embedded store; zero dependencies |
 | Tessera | `tessera` | POSIX tile-based append-only log; C2SP signed note output |
 
+> **Recommendation:** Use the Tessera backend for new deployments. It provides native C2SP witness cosigning, consistency proofs, and production-grade performance. The SQLite backend remains supported for zero-dependency environments and development. The internal `merkle` package is deprecated and retained only for the SQLite backend; all Merkle tree operations for Tessera go through the Tessera library directly.
+
 ```bash
 ./bin/siqlah \
   --log-backend tessera \
