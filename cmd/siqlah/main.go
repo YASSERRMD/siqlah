@@ -31,6 +31,11 @@ var (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		runMigrate(os.Args[2:])
+		return
+	}
+
 	addr := flag.String("addr", ":8080", "HTTP listen address")
 	dbPath := flag.String("db", "siqlah.db", "SQLite database path")
 	batchInterval := flag.Duration("batch-interval", 30*time.Second, "interval between automatic checkpoint builds")
