@@ -1,4 +1,4 @@
-# siqlah &nbsp;·&nbsp; سِقلة
+# siqlah
 
 <p align="center">
   <strong>Cryptographic accountability for AI API billing</strong><br>
@@ -21,10 +21,6 @@
 
 ---
 
-> **siqlah** (سِقلة) — Arabic: *"polish"* or *"refinement"*. The tool that brings clarity and proof to what was previously opaque: AI token billing.
-
----
-
 ## The Problem
 
 Every major AI provider — OpenAI, Anthropic, Google — prints a token count in their API response. That number directly determines your invoice. Yet **no independent party verifies it**. You trust a JSON field.
@@ -41,31 +37,6 @@ siqlah closes this gap:
 ---
 
 ## Architecture
-
-<!-- ARCHITECTURE DIAGRAM -->
-<!-- Replace this block with the generated diagram image. See docs/gemini-diagram-prompt.md for the prompt to use with Google AI Studio / Gemini to generate a professional architecture diagram for this system. -->
-
-```
-┌──────────────────────────────────────────────────────┐
-│  Layer 4: Witness Network                             │
-│  Independent parties co-sign checkpoints             │
-│  (Ed25519, C2SP-compatible)                          │
-├──────────────────────────────────────────────────────┤
-│  Layer 3: Checkpoint Log                             │
-│  RFC 6962 Merkle tree over receipt batches           │
-│  Append-only, consistency-provable                   │
-├──────────────────────────────────────────────────────┤
-│  Layer 2: Receipt Store                              │
-│  Signed, canonical VUR records per API call          │
-│  SQLite (dev) / ClickHouse / TimescaleDB (prod)      │
-├──────────────────────────────────────────────────────┤
-│  Layer 1: Provider Adapters                          │
-│  OpenAI · Anthropic · Generic (OpenAI-compatible)    │
-│  Parse raw provider responses into normalized usage  │
-└──────────────────────────────────────────────────────┘
-```
-
-> **Generate a visual diagram:** Use the prompt in [`docs/gemini-diagram-prompt.md`](docs/gemini-diagram-prompt.md) with [Google AI Studio](https://aistudio.google.com) to produce a publication-quality architecture diagram. Replace the ASCII block above with the result.
 
 See [`docs/architecture.md`](docs/architecture.md) for the full four-layer design, data flow, and threat model.
 
