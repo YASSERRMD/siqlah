@@ -43,19 +43,23 @@ func NewReceiptStatement(receipt *vur.Receipt) (*ReceiptStatement, error) {
 	if receipt == nil {
 		return nil, fmt.Errorf("receipt must not be nil")
 	}
-	if receipt.RequestHash == "" || receipt.ResponseHash == "" {
-		return nil, fmt.Errorf("receipt %s is missing request or response hash", receipt.ID)
+	if receipt.ResponseHash == "" {
+		return nil, fmt.Errorf("receipt %s is missing response hash", receipt.ID)
 	}
 
+	// ResponseHash is always present; RequestHash is only added when a request body
+	// was captured (it is optional — some proxy deployments omit the request body).
 	subjects := []ResourceDigest{
-		{
-			Name:   "request:" + receipt.ID,
-			Digest: map[string]string{"sha256": receipt.RequestHash},
-		},
 		{
 			Name:   "response:" + receipt.ID,
 			Digest: map[string]string{"sha256": receipt.ResponseHash},
 		},
+	}
+	if receipt.RequestHash != "" {
+		subjects = append([]ResourceDigest{{
+			Name:   "request:" + receipt.ID,
+			Digest: map[string]string{"sha256": receipt.RequestHash},
+		}}, subjects...)
 	}
 
 	predicate := buildPredicate(receipt)
