@@ -1,0 +1,23 @@
+{
+  "id": "chatcmpl-reasoning-001",
+  "object": "chat.completion",
+  "model": "o1-mini",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The answer is 42."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 200,
+    "completion_tokens": 800,
+    "total_tokens": 1000,
+    "completion_tokens_details": {
+      "reasoning_tokens": 600
+    }
+  }
+}
