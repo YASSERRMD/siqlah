@@ -1,6 +1,7 @@
 package witness
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 
@@ -8,77 +9,60 @@ import (
 )
 
 // MergeCosignatures combines an operator-signed checkpoint with additional cosigned
-// checkpoints, returning a single note that contains all signatures.
-// The operatorVerifier is used to filter out duplicate operator signatures.
-func MergeCosignatures(operatorSigned []byte, cosignedNotes []string, operatorVerifier note.Verifier) ([]byte, error) {
-	// Parse the operator's own note.
-	baseNote, err := note.Open(operatorSigned, note.VerifierList(operatorVerifier))
-	if err != nil {
-		// Try with empty verifiers to get the unverified note
-		unv, ue := note.Open(operatorSigned, note.VerifierList())
-		if ue != nil {
-			// UnverifiedNoteError still gives us the note
-			if unvErr, ok := ue.(*note.UnverifiedNoteError); ok {
-				baseNote = unvErr.Note
-			} else {
-				return nil, fmt.Errorf("parse operator note: %w", err)
-			}
-		} else {
-			baseNote = unv
+// checkpoints, returning a single note that contains all unique signatures.
+// The signed note format is: <text>\n\n<sigline1>\n<sigline2>\n...
+func MergeCosignatures(operatorSigned []byte, cosignedNotes []string, _ note.Verifier) ([]byte, error) {
+	// Split the operator-signed note into body and signature sections.
+	idx := bytes.Index(operatorSigned, []byte("\n\n"))
+	if idx < 0 {
+		return nil, fmt.Errorf("malformed operator note: missing \\n\\n separator")
+	}
+
+	body := string(operatorSigned[:idx+1]) // body including its trailing \n
+	sigSection := string(operatorSigned[idx+2:])
+
+	// Collect unique signature lines from the operator note.
+	seen := map[string]bool{}
+	var sigLines []string
+	for _, line := range strings.Split(sigSection, "\n") {
+		line = strings.TrimRight(line, "\r")
+		if line == "" || !strings.HasPrefix(line, "— ") {
+			continue
+		}
+		if !seen[line] {
+			seen[line] = true
+			sigLines = append(sigLines, line)
 		}
 	}
 
-	// Collect all cosignature lines from witness notes.
-	// Each cosigned note has the same body but different/additional signature lines.
-	extraSigs := []note.Signature{}
-	seen := map[string]bool{}
-	for _, sig := range baseNote.Sigs {
-		seen[sig.Base64] = true
-	}
-	for _, sig := range baseNote.UnverifiedSigs {
-		seen[sig.Base64] = true
-	}
-
+	// Collect unique sig lines from each cosigned note.
 	for _, cosigned := range cosignedNotes {
-		// Extract the signature lines from each cosigned note.
 		parts := strings.SplitN(cosigned, "\n\n", 2)
 		if len(parts) < 2 {
 			continue
 		}
 		for _, line := range strings.Split(parts[1], "\n") {
-			line = strings.TrimSpace(line)
-			if !strings.HasPrefix(line, "— ") || line == "" {
+			line = strings.TrimRight(line, "\r")
+			if line == "" || !strings.HasPrefix(line, "— ") {
 				continue
 			}
-			// Parse "— <name> <b64hash+sig>"
-			fields := strings.Fields(line[2:]) // strip "— "
-			if len(fields) < 2 {
-				continue
-			}
-			b64 := fields[len(fields)-1]
-			if !seen[b64] {
-				seen[b64] = true
-				extraSigs = append(extraSigs, note.Signature{
-					Name:   strings.Join(fields[:len(fields)-1], " "),
-					Base64: b64,
-				})
+			if !seen[line] {
+				seen[line] = true
+				sigLines = append(sigLines, line)
 			}
 		}
 	}
 
-	// Rebuild the merged note.
-	mergedNote := &note.Note{
-		Text:           baseNote.Text,
-		Sigs:           baseNote.Sigs,
-		UnverifiedSigs: append(baseNote.UnverifiedSigs, extraSigs...),
+	// Reassemble the merged note: body + \n + sig lines.
+	var out strings.Builder
+	out.WriteString(body)
+	out.WriteString("\n")
+	for _, line := range sigLines {
+		out.WriteString(line)
+		out.WriteString("\n")
 	}
 
-	// Re-sign (no new signers) — this just serializes with existing sigs.
-	result, err := note.Sign(mergedNote)
-	if err != nil {
-		return nil, fmt.Errorf("serialize merged note: %w", err)
-	}
-	return result, nil
+	return []byte(out.String()), nil
 }
 
 // ExtractCosignatures extracts signature lines from a cosigned note (excluding the operator).
@@ -93,7 +77,6 @@ func ExtractCosignatures(cosigned string, operatorName string) []string {
 		if !strings.HasPrefix(line, "— ") {
 			continue
 		}
-		// Skip the operator's own signature line.
 		if strings.HasPrefix(line[2:], operatorName+" ") {
 			continue
 		}
