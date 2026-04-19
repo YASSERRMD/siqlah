@@ -1,0 +1,45 @@
+# Go
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+go.sum
+
+# Rust / Cargo
+target/
+Cargo.lock
+*.rlib
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.DS_Store
+
+# Binaries
+siqlah
+witness
+verifier
+
+# Temp
+tmp/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
