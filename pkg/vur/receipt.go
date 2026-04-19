@@ -23,7 +23,10 @@ type Receipt struct {
 	RequestID           string    `json:"request_id"`
 	Timestamp           time.Time `json:"timestamp"`
 	SignerIdentity      string    `json:"signer_identity"`
+	SignerType          string    `json:"signer_type"`
 	SignatureHex        string    `json:"signature_hex"`
+	CertificatePEM      string    `json:"certificate_pem,omitempty"`
+	RekorLogIndex       int64     `json:"rekor_log_index,omitempty"`
 	Verified            bool      `json:"verified"`
 	DiscrepancyPct      float64   `json:"discrepancy_pct"`
 }

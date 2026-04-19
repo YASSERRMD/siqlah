@@ -7,6 +7,7 @@ import (
 
 // canonicalReceipt mirrors Receipt with explicit field ordering for deterministic JSON.
 type canonicalReceipt struct {
+	CertificatePEM       string  `json:"certificate_pem,omitempty"`
 	DiscrepancyPct       float64 `json:"discrepancy_pct"`
 	ID                   string  `json:"id"`
 	InputTokens          int64   `json:"input_tokens"`
@@ -15,10 +16,12 @@ type canonicalReceipt struct {
 	OutputTokens         int64   `json:"output_tokens"`
 	Provider             string  `json:"provider"`
 	ReasoningTokens      int64   `json:"reasoning_tokens"`
+	RekorLogIndex        int64   `json:"rekor_log_index,omitempty"`
 	RequestHash          string  `json:"request_hash"`
 	RequestID            string  `json:"request_id"`
 	ResponseHash         string  `json:"response_hash"`
 	SignerIdentity       string  `json:"signer_identity"`
+	SignerType           string  `json:"signer_type"`
 	Tenant               string  `json:"tenant"`
 	Timestamp            string  `json:"timestamp"`
 	TokenBoundaryRoot    string  `json:"token_boundary_root"`
@@ -34,6 +37,7 @@ type canonicalReceipt struct {
 // Fields are sorted alphabetically; timestamp is RFC3339Nano UTC; no whitespace.
 func (r *Receipt) CanonicalBytes() ([]byte, error) {
 	cr := canonicalReceipt{
+		CertificatePEM:       r.CertificatePEM,
 		DiscrepancyPct:       r.DiscrepancyPct,
 		ID:                   r.ID,
 		InputTokens:          r.InputTokens,
@@ -42,10 +46,12 @@ func (r *Receipt) CanonicalBytes() ([]byte, error) {
 		OutputTokens:         r.OutputTokens,
 		Provider:             r.Provider,
 		ReasoningTokens:      r.ReasoningTokens,
+		RekorLogIndex:        r.RekorLogIndex,
 		RequestHash:          r.RequestHash,
 		RequestID:            r.RequestID,
 		ResponseHash:         r.ResponseHash,
 		SignerIdentity:       r.SignerIdentity,
+		SignerType:           r.SignerType,
 		Tenant:               r.Tenant,
 		Timestamp:            r.Timestamp.UTC().Format("2006-01-02T15:04:05.999999999Z"),
 		TokenBoundaryRoot:    r.TokenBoundaryRoot,

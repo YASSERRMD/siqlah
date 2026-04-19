@@ -7,9 +7,16 @@ import (
 	"fmt"
 )
 
+// ReceiptSchemaVersion is the current schema version for new receipts.
+const ReceiptSchemaVersion = "1.1.0"
+
 // SignReceipt signs the canonical bytes of r with privateKey and stores the hex signature.
+// Sets SignerType to "ed25519" if not already set.
 // The SignatureHex field must be empty before signing (it is not included in canonical bytes).
 func SignReceipt(r *Receipt, privateKey ed25519.PrivateKey) error {
+	if r.SignerType == "" {
+		r.SignerType = "ed25519"
+	}
 	r.SignatureHex = ""
 	b, err := r.CanonicalBytes()
 	if err != nil {
