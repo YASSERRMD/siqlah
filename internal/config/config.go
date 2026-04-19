@@ -20,6 +20,11 @@ type Config struct {
 	DiscrepancyThreshold float64      `json:"discrepancy_threshold"`
 	AlertWebhook        string        `json:"alert_webhook"`
 	OperatorKey         string        `json:"operator_key"`
+
+	// Tessera backend configuration
+	LogBackend        string `json:"log_backend"`         // "sqlite" (default) or "tessera"
+	TesseraStoragePath string `json:"tessera_storage_path"` // path for POSIX tile storage
+	TesseraLogName    string `json:"tessera_log_name"`    // C2SP log origin string
 }
 
 // rawConfig mirrors Config with duration fields as strings for JSON parsing.
@@ -34,6 +39,9 @@ type rawConfig struct {
 	DiscrepancyThreshold float64 `json:"discrepancy_threshold"`
 	AlertWebhook         string  `json:"alert_webhook"`
 	OperatorKey          string  `json:"operator_key"`
+	LogBackend           string  `json:"log_backend"`
+	TesseraStoragePath   string  `json:"tessera_storage_path"`
+	TesseraLogName       string  `json:"tessera_log_name"`
 }
 
 // Defaults returns a Config populated with default values matching the CLI flags.
@@ -46,6 +54,9 @@ func Defaults() Config {
 		Monitor:              false,
 		MonitorInterval:      60 * time.Second,
 		DiscrepancyThreshold: 5.0,
+		LogBackend:           "sqlite",
+		TesseraStoragePath:   "./tessera-data/",
+		TesseraLogName:       "siqlah.dev/log",
 	}
 }
 
@@ -99,6 +110,15 @@ func Load(path string) (*Config, error) {
 	}
 	if raw.OperatorKey != "" {
 		cfg.OperatorKey = raw.OperatorKey
+	}
+	if raw.LogBackend != "" {
+		cfg.LogBackend = raw.LogBackend
+	}
+	if raw.TesseraStoragePath != "" {
+		cfg.TesseraStoragePath = raw.TesseraStoragePath
+	}
+	if raw.TesseraLogName != "" {
+		cfg.TesseraLogName = raw.TesseraLogName
 	}
 
 	return &cfg, nil
