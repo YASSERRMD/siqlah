@@ -1,3 +1,7 @@
+// DEPRECATED: The custom cosigning format in this file is superseded by the C2SP
+// tlog-cosignature/v1 protocol implemented in internal/witness/. Existing witness
+// signatures created via CoSign/VerifyWitness remain valid for legacy checkpoints.
+// New cosignatures should use internal/witness.WitnessClient.VerifyAndCosign instead.
 package checkpoint
 
 import (

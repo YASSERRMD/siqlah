@@ -14,12 +14,13 @@ import (
 
 // Server is the HTTP API server for siqlah.
 type Server struct {
-	store       store.Store
-	builder     *checkpoint.Builder
-	operatorPub ed25519.PublicKey
+	store        store.Store
+	builder      *checkpoint.Builder
+	operatorPub  ed25519.PublicKey
 	operatorPriv ed25519.PrivateKey
-	registry    providerRegistry
-	version     string
+	registry     providerRegistry
+	version      string
+	logOrigin    string
 }
 
 // providerRegistry abstracts the provider.Registry for test injection.
@@ -36,8 +37,24 @@ func New(
 	reg providerRegistry,
 	version string,
 ) *Server {
+	return NewWithOrigin(st, b, operatorPub, operatorPriv, reg, version, "")
+}
+
+// NewWithOrigin creates a new Server with a custom C2SP log origin string.
+func NewWithOrigin(
+	st store.Store,
+	b *checkpoint.Builder,
+	operatorPub ed25519.PublicKey,
+	operatorPriv ed25519.PrivateKey,
+	reg providerRegistry,
+	version string,
+	logOrigin string,
+) *Server {
 	if version == "" {
 		version = "dev"
+	}
+	if logOrigin == "" {
+		logOrigin = "siqlah.dev/log"
 	}
 	return &Server{
 		store:        st,
@@ -46,6 +63,7 @@ func New(
 		operatorPriv: operatorPriv,
 		registry:     reg,
 		version:      version,
+		logOrigin:    logOrigin,
 	}
 }
 
@@ -69,6 +87,11 @@ func (s *Server) Routes() *http.ServeMux {
 
 	// Tessera log routes (available when Tessera backend is configured)
 	mux.HandleFunc("GET /v1/log/checkpoint", s.handleLogCheckpoint)
+
+	// C2SP witness routes
+	mux.HandleFunc("GET /v1/witness/checkpoint", s.handleC2SPCheckpoint)
+	mux.HandleFunc("POST /v1/witness/cosign", s.handleC2SPCosign)
+	mux.HandleFunc("GET /v1/witness/cosigned-checkpoint", s.handleC2SPCosignedCheckpoint)
 
 	// Utility routes
 	mux.HandleFunc("GET /v1/health", s.handleHealth)

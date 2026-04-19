@@ -118,6 +118,7 @@ func TestCosignWithMockServer(t *testing.T) {
 
 	if err := runCosign([]string{
 		"--ledger", srv.URL,
+		"--legacy",
 		"--cp", "1",
 		"--key", keyFile,
 		"--op-pub", hex.EncodeToString(opPub),
@@ -158,6 +159,7 @@ func TestVerifyWithMockServer(t *testing.T) {
 
 	if err := runVerify([]string{
 		"--ledger", srv.URL,
+		"--legacy",
 		"--cp", "1",
 		"--op-pub", hex.EncodeToString(opPub),
 	}); err != nil {
