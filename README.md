@@ -347,6 +347,7 @@ See [`docs/migration-v0.1-to-v0.2.md`](docs/migration-v0.1-to-v0.2.md) for the s
 | [`docs/architecture.md`](docs/architecture.md) | Four-layer design, data flow, threat model |
 | [`docs/receipt-spec.md`](docs/receipt-spec.md) | VUR receipt format and canonical serialization spec |
 | [`docs/witness-protocol.md`](docs/witness-protocol.md) | Witness verification and cosigning protocol |
+| [`docs/witness-interop.md`](docs/witness-interop.md) | Connecting to Sigsum, Armored Witness, and other external witnesses |
 | [`docs/migration-v0.1-to-v0.2.md`](docs/migration-v0.1-to-v0.2.md) | SQLite → Tessera upgrade guide and rollback |
 | [`docs/interop.md`](docs/interop.md) | C2SP, Sigstore bundle, Rekor v2, x402 interoperability reference |
 | [`docs/docker.md`](docs/docker.md) | Docker and Docker Compose deployment guide |
