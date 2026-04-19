@@ -217,3 +217,44 @@ func hexSlice(hashes [][32]byte) []string {
 	}
 	return out
 }
+
+// TesseraInclusionProofResponse is returned by GET /v1/receipts/{id}/proof (Tessera backend).
+type TesseraInclusionProofResponse struct {
+	ReceiptID string   `json:"receipt_id"`
+	LeafIndex uint64   `json:"leaf_index"`
+	TreeSize  uint64   `json:"tree_size"`
+	RootHex   string   `json:"root_hex"`
+	Proof     []string `json:"proof"`
+	Backend   string   `json:"backend"`
+}
+
+// TesseraConsistencyProofResponse is returned by consistency proof (Tessera backend).
+type TesseraConsistencyProofResponse struct {
+	OldSize    uint64   `json:"old_size"`
+	NewSize    uint64   `json:"new_size"`
+	OldRootHex string   `json:"old_root_hex,omitempty"`
+	NewRootHex string   `json:"new_root_hex"`
+	Proof      []string `json:"proof"`
+	Backend    string   `json:"backend"`
+}
+
+// handleLogCheckpoint returns the raw Tessera signed checkpoint note.
+// Content-type is text/plain (C2SP format) for standard tools.
+func (s *Server) handleLogCheckpoint(w http.ResponseWriter, r *http.Request) {
+	lcp, err := s.store.GetLogCheckpoint()
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "Tessera log not available: "+err.Error())
+		return
+	}
+	// Honour content negotiation: JSON consumers get a structured response.
+	if r.Header.Get("Accept") == "application/json" {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"tree_size": lcp.TreeSize,
+			"root_hex":  lcp.RootHex,
+		})
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(lcp.RawNote)
+}
