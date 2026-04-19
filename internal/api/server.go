@@ -9,6 +9,7 @@ import (
 
 	"github.com/yasserrmd/siqlah/internal/checkpoint"
 	"github.com/yasserrmd/siqlah/internal/store"
+	"github.com/yasserrmd/siqlah/internal/x402"
 	"github.com/yasserrmd/siqlah/pkg/vur"
 )
 
@@ -21,6 +22,7 @@ type Server struct {
 	registry     providerRegistry
 	version      string
 	logOrigin    string
+	x402Bridge   *x402.Bridge
 }
 
 // providerRegistry abstracts the provider.Registry for test injection.
@@ -64,6 +66,7 @@ func NewWithOrigin(
 		registry:     reg,
 		version:      version,
 		logOrigin:    logOrigin,
+		x402Bridge:   x402.NewBridge(),
 	}
 }
 
@@ -92,6 +95,10 @@ func (s *Server) Routes() *http.ServeMux {
 	mux.HandleFunc("GET /v1/witness/checkpoint", s.handleC2SPCheckpoint)
 	mux.HandleFunc("POST /v1/witness/cosign", s.handleC2SPCosign)
 	mux.HandleFunc("GET /v1/witness/cosigned-checkpoint", s.handleC2SPCosignedCheckpoint)
+
+	// x402 payment routes
+	mux.HandleFunc("POST /v1/receipts/with-payment", s.handleIngestWithPayment)
+	mux.HandleFunc("GET /v1/receipts/{id}/payment", s.handleGetReceiptPayment)
 
 	// Utility routes
 	mux.HandleFunc("GET /v1/health", s.handleHealth)
