@@ -261,3 +261,23 @@ func scanCheckpointRow(rows *sql.Rows) (*Checkpoint, error) {
 	cp.IssuedAt = time.Unix(issuedUnix, 0).UTC()
 	return &cp, nil
 }
+
+// AppendToLog is not supported by the SQLite (legacy) backend.
+func (s *SQLiteStore) AppendToLog(_ []byte) (uint64, error) {
+	return 0, fmt.Errorf("AppendToLog: not supported by SQLite backend; use Tessera backend")
+}
+
+// GetLogInclusionProof is not supported by the SQLite (legacy) backend.
+func (s *SQLiteStore) GetLogInclusionProof(_, _ uint64) (*InclusionProofResult, error) {
+	return nil, fmt.Errorf("GetLogInclusionProof: not supported by SQLite backend; use Tessera backend")
+}
+
+// GetLogConsistencyProof is not supported by the SQLite (legacy) backend.
+func (s *SQLiteStore) GetLogConsistencyProof(_, _ uint64) (*ConsistencyProofResult, error) {
+	return nil, fmt.Errorf("GetLogConsistencyProof: not supported by SQLite backend; use Tessera backend")
+}
+
+// GetLogCheckpoint is not supported by the SQLite (legacy) backend.
+func (s *SQLiteStore) GetLogCheckpoint() (*LogCheckpoint, error) {
+	return nil, fmt.Errorf("GetLogCheckpoint: not supported by SQLite backend; use Tessera backend")
+}

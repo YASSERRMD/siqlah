@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/hex"
 	"time"
 
 	"github.com/yasserrmd/siqlah/pkg/vur"
@@ -32,6 +33,39 @@ type StoredReceipt struct {
 	Receipt vur.Receipt
 }
 
+// InclusionProofResult holds a Merkle inclusion proof from the Tessera-backed log.
+type InclusionProofResult struct {
+	LeafIndex uint64
+	TreeSize  uint64
+	RootHex   string
+	Proof     [][]byte
+}
+
+// ConsistencyProofResult holds a Merkle consistency proof from the Tessera-backed log.
+type ConsistencyProofResult struct {
+	OldSize    uint64
+	NewSize    uint64
+	OldRootHex string
+	NewRootHex string
+	Proof      [][]byte
+}
+
+// LogCheckpoint holds the latest Tessera log checkpoint.
+type LogCheckpoint struct {
+	TreeSize uint64
+	RootHex  string
+	RawNote  []byte // raw C2SP signed note bytes
+}
+
+// ProofHexSlice converts [][]byte Merkle proof nodes to hex strings.
+func ProofHexSlice(proof [][]byte) []string {
+	out := make([]string, len(proof))
+	for i, p := range proof {
+		out[i] = hex.EncodeToString(p)
+	}
+	return out
+}
+
 // Store is the append-only storage interface for receipts and checkpoints.
 type Store interface {
 	// Receipt operations
@@ -50,6 +84,12 @@ type Store interface {
 	// Witness operations
 	AddWitnessSignature(cpID int64, witnessID, sigHex string) error
 	WitnessSignatures(cpID int64) (map[string]string, error)
+
+	// Tessera-backed log operations (optional; return ErrNotSupported if not available)
+	AppendToLog(receiptCanonicalBytes []byte) (logIndex uint64, err error)
+	GetLogInclusionProof(receiptIndex, treeSize uint64) (*InclusionProofResult, error)
+	GetLogConsistencyProof(oldSize, newSize uint64) (*ConsistencyProofResult, error)
+	GetLogCheckpoint() (*LogCheckpoint, error)
 
 	// Utility
 	Stats() (*StoreStats, error)
