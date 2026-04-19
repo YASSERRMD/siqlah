@@ -18,6 +18,7 @@ import (
 
 	"github.com/yasserrmd/siqlah/internal/checkpoint"
 	"github.com/yasserrmd/siqlah/internal/store"
+	"github.com/yasserrmd/siqlah/internal/witness"
 )
 
 func main() {
@@ -50,12 +51,12 @@ func usage() {
 
 Subcommands:
   keygen                                  Generate an Ed25519 keypair
-  cosign --ledger URL --cp ID --key PATH --op-pub HEX
-                                          Fetch a checkpoint, verify operator sig, and cosign
-  verify --ledger URL --cp ID --op-pub HEX
+  cosign --ledger URL --key PATH --op-pub HEX [--origin STR] [--witness-name NAME] [--legacy --cp ID]
+                                          Fetch latest C2SP checkpoint, verify operator sig, and cosign
+  verify --ledger URL --op-pub HEX [--origin STR] [--threshold N] [--legacy --cp ID]
                                           Verify a checkpoint's operator and witness signatures
-  watch  --ledger URL --op-pub HEX --key PATH --interval DURATION
-                                          Continuously watch for new checkpoints and auto-cosign`)
+  watch  --ledger URL --op-pub HEX --key PATH [--origin STR] [--interval DURATION]
+                                          Continuously watch for new checkpoints and auto-cosign (C2SP)`)
 }
 
 // --- keygen ---
@@ -92,16 +93,20 @@ func runKeygen(args []string) error {
 func runCosign(args []string) error {
 	fs := flag.NewFlagSet("cosign", flag.ContinueOnError)
 	ledger := fs.String("ledger", "", "siqlah server URL (required)")
-	cpID := fs.Int64("cp", 0, "checkpoint ID (required)")
 	keyPath := fs.String("key", "", "path to private key hex file (required)")
 	opPubHex := fs.String("op-pub", "", "operator public key hex (required)")
-	witnessID := fs.String("witness-id", "", "witness identifier (defaults to public key hex)")
+	origin := fs.String("origin", witness.DefaultOrigin, "C2SP log origin string")
+	witnessName := fs.String("witness-name", "", "witness name for note signing (defaults to public key hex)")
+	// Legacy mode flags
+	legacy := fs.Bool("legacy", false, "use legacy checkpoint cosign instead of C2SP")
+	cpID := fs.Int64("cp", 0, "checkpoint ID (legacy mode only)")
+	witnessID := fs.String("witness-id", "", "witness identifier (legacy mode only)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *ledger == "" || *cpID == 0 || *keyPath == "" || *opPubHex == "" {
+	if *ledger == "" || *keyPath == "" || *opPubHex == "" {
 		fs.Usage()
-		return errors.New("--ledger, --cp, --key, --op-pub are required")
+		return errors.New("--ledger, --key, --op-pub are required")
 	}
 
 	priv, pub, err := loadPrivKey(*keyPath)
@@ -113,27 +118,62 @@ func runCosign(args []string) error {
 		return fmt.Errorf("parse op-pub: %w", err)
 	}
 
-	wid := *witnessID
-	if wid == "" {
-		wid = hex.EncodeToString(pub)
+	if *legacy {
+		// Legacy mode: cosign a specific checkpoint by ID.
+		if *cpID == 0 {
+			return errors.New("--cp is required in --legacy mode")
+		}
+		wid := *witnessID
+		if wid == "" {
+			wid = hex.EncodeToString(pub)
+		}
+		cp, err := fetchCheckpoint(*ledger, *cpID)
+		if err != nil {
+			return fmt.Errorf("fetch checkpoint: %w", err)
+		}
+		sigHex, err := checkpoint.CoSign(*cp, opPub, priv)
+		if err != nil {
+			return fmt.Errorf("cosign: %w", err)
+		}
+		if err := submitWitness(*ledger, *cpID, wid, sigHex); err != nil {
+			return fmt.Errorf("submit witness: %w", err)
+		}
+		fmt.Printf("cosigned checkpoint %d as witness %s\n", *cpID, wid)
+		return nil
 	}
 
-	cp, err := fetchCheckpoint(*ledger, *cpID)
+	// C2SP mode.
+	name := *witnessName
+	if name == "" {
+		name = hex.EncodeToString(pub)
+	}
+
+	client := witness.NewWitnessClient(*ledger)
+	cp, err := client.FetchCheckpoint()
 	if err != nil {
-		return fmt.Errorf("fetch checkpoint: %w", err)
+		return fmt.Errorf("fetch C2SP checkpoint: %w", err)
 	}
+	fmt.Printf("fetched checkpoint: origin=%s tree_size=%d\n", cp.Origin, cp.TreeSize)
 
-	sigHex, err := checkpoint.CoSign(*cp, opPub, priv)
+	operatorVerifier, err := witness.NewNoteVerifier(*origin, opPub)
 	if err != nil {
-		return fmt.Errorf("cosign: %w", err)
+		return fmt.Errorf("create operator verifier: %w", err)
+	}
+	witnessKey, err := witness.NewNoteSigner(name, priv)
+	if err != nil {
+		return fmt.Errorf("create witness signer: %w", err)
 	}
 
-	if err := submitWitness(*ledger, *cpID, wid, sigHex); err != nil {
-		return fmt.Errorf("submit witness: %w", err)
+	cosigned, err := client.VerifyAndCosign(cp.Raw, operatorVerifier, witnessKey)
+	if err != nil {
+		return fmt.Errorf("verify and cosign: %w", err)
 	}
 
-	fmt.Printf("cosigned checkpoint %d as witness %s\n", *cpID, wid)
-	fmt.Printf("sig_hex: %s\n", sigHex)
+	if err := client.SubmitCosignature(cosigned); err != nil {
+		return fmt.Errorf("submit cosignature: %w", err)
+	}
+
+	fmt.Printf("cosigned and submitted C2SP checkpoint as witness %s\n", name)
 	return nil
 }
 
@@ -142,14 +182,18 @@ func runCosign(args []string) error {
 func runVerify(args []string) error {
 	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
 	ledger := fs.String("ledger", "", "siqlah server URL (required)")
-	cpID := fs.Int64("cp", 0, "checkpoint ID (required)")
 	opPubHex := fs.String("op-pub", "", "operator public key hex (required)")
+	origin := fs.String("origin", witness.DefaultOrigin, "C2SP log origin string")
+	threshold := fs.Int("threshold", 0, "minimum required witness cosignatures for C2SP verify")
+	// Legacy mode flags
+	legacy := fs.Bool("legacy", false, "use legacy checkpoint verify instead of C2SP")
+	cpID := fs.Int64("cp", 0, "checkpoint ID (legacy mode only)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *ledger == "" || *cpID == 0 || *opPubHex == "" {
+	if *ledger == "" || *opPubHex == "" {
 		fs.Usage()
-		return errors.New("--ledger, --cp, --op-pub are required")
+		return errors.New("--ledger, --op-pub are required")
 	}
 
 	opPub, err := hexToEd25519Pub(*opPubHex)
@@ -157,32 +201,52 @@ func runVerify(args []string) error {
 		return fmt.Errorf("parse op-pub: %w", err)
 	}
 
-	cp, err := fetchCheckpoint(*ledger, *cpID)
-	if err != nil {
-		return fmt.Errorf("fetch checkpoint: %w", err)
-	}
-
-	fmt.Printf("checkpoint %d: tree_size=%d root=%s\n", cp.ID, cp.TreeSize, cp.RootHex)
-
-	if err := checkpoint.VerifyOperatorSignature(*cp, opPub); err != nil {
-		fmt.Printf("operator_sig: INVALID (%v)\n", err)
-	} else {
-		fmt.Printf("operator_sig: VALID\n")
-	}
-
-	witnesses, err := fetchWitnesses(*ledger, *cpID)
-	if err != nil {
-		fmt.Printf("witnesses: error fetching (%v)\n", err)
+	if *legacy {
+		if *cpID == 0 {
+			return errors.New("--cp is required in --legacy mode")
+		}
+		cp, err := fetchCheckpoint(*ledger, *cpID)
+		if err != nil {
+			return fmt.Errorf("fetch checkpoint: %w", err)
+		}
+		fmt.Printf("checkpoint %d: tree_size=%d root=%s\n", cp.ID, cp.TreeSize, cp.RootHex)
+		if err := checkpoint.VerifyOperatorSignature(*cp, opPub); err != nil {
+			fmt.Printf("operator_sig: INVALID (%v)\n", err)
+		} else {
+			fmt.Printf("operator_sig: VALID\n")
+		}
+		witnesses, err := fetchWitnesses(*ledger, *cpID)
+		if err != nil {
+			fmt.Printf("witnesses: error fetching (%v)\n", err)
+			return nil
+		}
+		fmt.Printf("witnesses: %d\n", len(witnesses))
 		return nil
 	}
-	if len(witnesses) == 0 {
-		fmt.Println("witnesses: none")
-		return nil
+
+	// C2SP mode.
+	operatorVerifier, err := witness.NewNoteVerifier(*origin, opPub)
+	if err != nil {
+		return fmt.Errorf("create operator verifier: %w", err)
 	}
-	fmt.Printf("witnesses: %d\n", len(witnesses))
-	for wid, sig := range witnesses {
-		fmt.Printf("  %s: %s\n", wid, sig[:min(16, len(sig))]+"...")
+
+	client := witness.NewWitnessClient(*ledger)
+	rawCosigned, err := client.FetchCosignedCheckpoint()
+	if err != nil {
+		return fmt.Errorf("fetch cosigned checkpoint: %w", err)
 	}
+
+	if err := witness.VerifyCosignedCheckpoint(rawCosigned, operatorVerifier, nil, *threshold); err != nil {
+		fmt.Printf("verification FAILED: %v\n", err)
+		return err
+	}
+
+	cp, err := witness.ParseCheckpoint(rawCosigned)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("C2SP checkpoint VALID: origin=%s tree_size=%d threshold=%d\n",
+		cp.Origin, cp.TreeSize, *threshold)
 	return nil
 }
 
@@ -194,7 +258,8 @@ func runWatch(args []string) error {
 	opPubHex := fs.String("op-pub", "", "operator public key hex (required)")
 	keyPath := fs.String("key", "", "path to private key hex file (required)")
 	interval := fs.Duration("interval", 30*time.Second, "polling interval")
-	witnessID := fs.String("witness-id", "", "witness identifier (defaults to public key hex)")
+	origin := fs.String("origin", witness.DefaultOrigin, "C2SP log origin string")
+	witnessName := fs.String("witness-name", "", "witness name for note signing (defaults to public key hex)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -212,42 +277,44 @@ func runWatch(args []string) error {
 		return fmt.Errorf("parse op-pub: %w", err)
 	}
 
-	wid := *witnessID
-	if wid == "" {
-		wid = hex.EncodeToString(pub)
+	name := *witnessName
+	if name == "" {
+		name = hex.EncodeToString(pub)
 	}
 
-	fmt.Printf("watching %s every %s as witness %s\n", *ledger, *interval, wid)
+	operatorVerifier, err := witness.NewNoteVerifier(*origin, opPub)
+	if err != nil {
+		return fmt.Errorf("create operator verifier: %w", err)
+	}
+	witnessKey, err := witness.NewNoteSigner(name, priv)
+	if err != nil {
+		return fmt.Errorf("create witness signer: %w", err)
+	}
 
-	lastSigned := int64(0)
+	client := witness.NewWitnessClient(*ledger)
+	fmt.Printf("watching %s every %s as witness %s (C2SP)\n", *ledger, *interval, name)
+
+	var lastTreeSize uint64
 	for {
-		cps, err := listCheckpoints(*ledger, 0, 50)
+		cp, err := client.FetchCheckpoint()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "list checkpoints: %v\n", err)
-		} else {
-			for i := len(cps) - 1; i >= 0; i-- {
-				cp := &cps[i]
-				if cp.ID <= lastSigned {
-					continue
-				}
-				sigHex, err := checkpoint.CoSign(*cp, opPub, priv)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "cosign cp %d: %v\n", cp.ID, err)
-					continue
-				}
-				if err := submitWitness(*ledger, cp.ID, wid, sigHex); err != nil {
-					fmt.Fprintf(os.Stderr, "submit cp %d: %v\n", cp.ID, err)
-					continue
-				}
-				fmt.Printf("cosigned checkpoint %d\n", cp.ID)
-				lastSigned = cp.ID
+			fmt.Fprintf(os.Stderr, "fetch checkpoint: %v\n", err)
+		} else if cp.TreeSize > lastTreeSize {
+			cosigned, err := client.VerifyAndCosign(cp.Raw, operatorVerifier, witnessKey)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "verify and cosign: %v\n", err)
+			} else if err := client.SubmitCosignature(cosigned); err != nil {
+				fmt.Fprintf(os.Stderr, "submit cosignature: %v\n", err)
+			} else {
+				fmt.Printf("cosigned checkpoint tree_size=%d\n", cp.TreeSize)
+				lastTreeSize = cp.TreeSize
 			}
 		}
 		time.Sleep(*interval)
 	}
 }
 
-// --- HTTP helpers ---
+// --- HTTP helpers (legacy) ---
 
 func fetchCheckpoint(ledger string, id int64) (*store.Checkpoint, error) {
 	resp, err := http.Get(ledger + "/v1/checkpoints/" + strconv.FormatInt(id, 10))
@@ -302,24 +369,6 @@ func submitWitness(ledger string, cpID int64, witnessID, sigHex string) error {
 	return nil
 }
 
-type checkpointList struct {
-	Checkpoints []store.Checkpoint `json:"checkpoints"`
-}
-
-func listCheckpoints(ledger string, offset, limit int) ([]store.Checkpoint, error) {
-	url := fmt.Sprintf("%s/v1/checkpoints?offset=%d&limit=%d", ledger, offset, limit)
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	var cl checkpointList
-	if err := json.NewDecoder(resp.Body).Decode(&cl); err != nil {
-		return nil, err
-	}
-	return cl.Checkpoints, nil
-}
-
 // --- key helpers ---
 
 func loadPrivKey(path string) (ed25519.PrivateKey, ed25519.PublicKey, error) {
@@ -349,11 +398,4 @@ func hexToEd25519Pub(h string) (ed25519.PublicKey, error) {
 		return nil, fmt.Errorf("expected %d-byte public key, got %d", ed25519.PublicKeySize, len(b))
 	}
 	return ed25519.PublicKey(b), nil
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
