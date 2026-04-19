@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - 'phase_*'
+      - main
+  pull_request:
+    branches:
+      - 'phase_*'
+      - main
+
+jobs:
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: tokenizer-rs/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('tokenizer-rs/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build Rust tokenizer
+        run: cd tokenizer-rs && cargo build --release
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Build all binaries
+        run: go build ./...
+
+      - name: Run tests (excluding CGo tokenizer)
+        run: |
+          go test \
+            ./pkg/... \
+            ./internal/merkle/... \
+            ./internal/store/... \
+            ./internal/checkpoint/... \
+            ./internal/provider/... \
+            ./internal/api/... \
+            ./internal/monitor/... \
+            ./internal/config/... \
+            ./cmd/witness/... \
+            ./cmd/verifier/... \
+            ./test/... \
+            -timeout 120s
+
+      - name: Run CGo tokenizer tests
+        run: go test ./internal/tokenizer/... -timeout 60s
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Check go.mod is tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+  benchmark:
+    name: Benchmarks (smoke)
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Run benchmarks (1 iteration each for smoke test)
+        run: |
+          go test ./test/... -bench=. -benchtime=1x -run='^$' -timeout 60s
