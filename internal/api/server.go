@@ -108,6 +108,7 @@ func (s *Server) Routes() *http.ServeMux {
 	mux.HandleFunc("POST /v1/receipts/batch", s.handleIngestBatch)
 	mux.HandleFunc("GET /v1/receipts/{id}", s.handleGetReceipt)
 	mux.HandleFunc("GET /v1/receipts/{id}/proof", s.handleInclusionProof)
+	mux.HandleFunc("GET /v1/receipts/{id}/attestation", s.handleAttestation)
 
 	// Checkpoint routes
 	mux.HandleFunc("POST /v1/checkpoints/build", s.handleBuildCheckpoint)
