@@ -6,9 +6,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). siq
 
 ---
 
-## [Unreleased]
+## [0.2.0] — 2026-04-19
 
 ### Added
+
+- Push-based witness feeder (`internal/witness.WitnessFeeder`) for `transparency-dev/witness` ecosystem interop — siqlah can now proactively push checkpoints to any C2SP tlog-witness endpoint, including Sigsum witnesses and Armored Witness hardware devices
+- Witness CLI `feed` subcommand (`siqlah-witness feed`) for standalone feeder operation
+- `--witness-feed`, `--witness-urls`, `--witness-feed-interval` service flags
+- In-toto/SLSA attestation (`internal/attestation`) — any receipt can be returned as an in-toto v1 Statement with a `https://siqlah.dev/receipt/v1` predicate, including optional model provenance and energy footprint sub-objects
+- `GET /v1/receipts/{id}/attestation` endpoint (`application/vnd.in-toto+json`)
+- Witness interoperability guide (`docs/witness-interop.md`) — Sigsum, Armored Witness, and C2SP protocol reference
+- In-toto attestation guide (`docs/attestation.md`) — cosign, GUAC, OPA integration examples
+- Log backend recommendation callout in README
+
+### Changed
+
+- `internal/merkle/` formally deprecated in favor of Tessera backend; all exported symbols now carry `// Deprecated:` godoc annotations visible to IDEs and `go doc`
+
+### Dependencies
+
+- Added: `github.com/transparency-dev/witness`
+
+---
 
 **Phase 23 — Tests, Migration & Interop Docs**
 - SQLite-to-Tessera migration subcommand (`siqlah migrate`) with batch processing, dry-run mode, and idempotent append
