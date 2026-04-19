@@ -10,21 +10,32 @@ import (
 
 // Config holds all siqlah service configuration.
 type Config struct {
-	Addr                string        `json:"addr"`
-	DB                  string        `json:"db"`
-	BatchInterval       time.Duration `json:"batch_interval"`
-	MaxBatch            int           `json:"max_batch"`
-	Witnesses           string        `json:"witnesses"`
-	Monitor             bool          `json:"monitor"`
-	MonitorInterval     time.Duration `json:"monitor_interval"`
-	DiscrepancyThreshold float64      `json:"discrepancy_threshold"`
-	AlertWebhook        string        `json:"alert_webhook"`
-	OperatorKey         string        `json:"operator_key"`
+	Addr                 string        `json:"addr"`
+	DB                   string        `json:"db"`
+	BatchInterval        time.Duration `json:"batch_interval"`
+	MaxBatch             int           `json:"max_batch"`
+	Witnesses            string        `json:"witnesses"`
+	Monitor              bool          `json:"monitor"`
+	MonitorInterval      time.Duration `json:"monitor_interval"`
+	DiscrepancyThreshold float64       `json:"discrepancy_threshold"`
+	AlertWebhook         string        `json:"alert_webhook"`
+	OperatorKey          string        `json:"operator_key"`
 
 	// Tessera backend configuration
-	LogBackend        string `json:"log_backend"`         // "sqlite" (default) or "tessera"
+	LogBackend         string `json:"log_backend"`          // "sqlite" (default) or "tessera"
 	TesseraStoragePath string `json:"tessera_storage_path"` // path for POSIX tile storage
-	TesseraLogName    string `json:"tessera_log_name"`    // C2SP log origin string
+	TesseraLogName     string `json:"tessera_log_name"`     // C2SP log origin string
+
+	// Signing backend: "ed25519" (default) or "fulcio" (keyless).
+	SigningBackend string `json:"signing_backend"`
+	// OIDCIssuer is the OIDC provider URL used for Fulcio keyless signing.
+	OIDCIssuer string `json:"oidc_issuer"`
+	// OIDCClientID is the OIDC client ID for interactive token flows.
+	OIDCClientID string `json:"oidc_client_id"`
+	// RekorURL is the Rekor transparency log URL (empty disables Rekor logging).
+	RekorURL string `json:"rekor_url"`
+	// FulcioURL is the Fulcio CA endpoint for keyless signing.
+	FulcioURL string `json:"fulcio_url"`
 }
 
 // rawConfig mirrors Config with duration fields as strings for JSON parsing.
@@ -42,6 +53,11 @@ type rawConfig struct {
 	LogBackend           string  `json:"log_backend"`
 	TesseraStoragePath   string  `json:"tessera_storage_path"`
 	TesseraLogName       string  `json:"tessera_log_name"`
+	SigningBackend        string  `json:"signing_backend"`
+	OIDCIssuer           string  `json:"oidc_issuer"`
+	OIDCClientID         string  `json:"oidc_client_id"`
+	RekorURL             string  `json:"rekor_url"`
+	FulcioURL            string  `json:"fulcio_url"`
 }
 
 // Defaults returns a Config populated with default values matching the CLI flags.
@@ -57,6 +73,10 @@ func Defaults() Config {
 		LogBackend:           "sqlite",
 		TesseraStoragePath:   "./tessera-data/",
 		TesseraLogName:       "siqlah.dev/log",
+		SigningBackend:        "ed25519",
+		OIDCIssuer:           "https://accounts.google.com",
+		FulcioURL:            "https://fulcio.sigstore.dev",
+		RekorURL:             "",
 	}
 }
 
@@ -119,6 +139,21 @@ func Load(path string) (*Config, error) {
 	}
 	if raw.TesseraLogName != "" {
 		cfg.TesseraLogName = raw.TesseraLogName
+	}
+	if raw.SigningBackend != "" {
+		cfg.SigningBackend = raw.SigningBackend
+	}
+	if raw.OIDCIssuer != "" {
+		cfg.OIDCIssuer = raw.OIDCIssuer
+	}
+	if raw.OIDCClientID != "" {
+		cfg.OIDCClientID = raw.OIDCClientID
+	}
+	if raw.RekorURL != "" {
+		cfg.RekorURL = raw.RekorURL
+	}
+	if raw.FulcioURL != "" {
+		cfg.FulcioURL = raw.FulcioURL
 	}
 
 	return &cfg, nil

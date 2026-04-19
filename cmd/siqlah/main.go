@@ -20,6 +20,7 @@ import (
 	"github.com/yasserrmd/siqlah/internal/checkpoint"
 	"github.com/yasserrmd/siqlah/internal/monitor"
 	"github.com/yasserrmd/siqlah/internal/provider"
+	"github.com/yasserrmd/siqlah/internal/signing"
 	"github.com/yasserrmd/siqlah/internal/store"
 )
 
@@ -43,7 +44,14 @@ func main() {
 	logBackend := flag.String("log-backend", "sqlite", "log backend: sqlite (legacy) or tessera")
 	tesseraPath := flag.String("tessera-storage-path", "./tessera-data/", "POSIX path for Tessera tile storage")
 	tesseraLogName := flag.String("tessera-log-name", "siqlah.dev/log", "C2SP log origin string for Tessera")
+	signingBackend := flag.String("signing-backend", "ed25519", "signing backend: ed25519 or fulcio")
+	oidcIssuer := flag.String("oidc-issuer", "https://accounts.google.com", "OIDC issuer URL for Fulcio keyless signing")
+	oidcClientID := flag.String("oidc-client-id", "", "OIDC client ID for Fulcio token flow")
+	rekorURL := flag.String("rekor-url", "", "Rekor transparency log URL (empty disables Rekor logging)")
+	fulcioURL := flag.String("fulcio-url", "https://fulcio.sigstore.dev", "Fulcio CA endpoint for keyless signing")
 	flag.Parse()
+
+	_, _ = *oidcClientID, *oidcIssuer // surfaced for future integration
 
 	printBanner()
 
@@ -66,6 +74,21 @@ func main() {
 		log.Printf("generated operator key (ephemeral — set --operator-key to persist)")
 	}
 	log.Printf("operator public key: %s", hex.EncodeToString(operatorPub))
+
+	// Wire the signing backend.
+	var receiptSigner signing.Signer
+	switch *signingBackend {
+	case "fulcio":
+		log.Printf("signing backend: fulcio (keyless) — OIDC issuer: %s", *oidcIssuer)
+		receiptSigner = signing.NewFulcioSigner(signing.FulcioOptions{
+			FulcioURL: *fulcioURL,
+			RekorURL:  *rekorURL,
+		})
+	default:
+		log.Printf("signing backend: ed25519")
+		receiptSigner = signing.NewEd25519Signer(operatorPriv)
+	}
+	_ = receiptSigner // passed to API in future integration
 
 	// Open the store — SQLite (legacy) or Tessera (production).
 	ctx, cancel := context.WithCancel(context.Background())
