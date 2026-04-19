@@ -29,4 +29,8 @@ type Receipt struct {
 	RekorLogIndex       int64     `json:"rekor_log_index,omitempty"`
 	Verified            bool      `json:"verified"`
 	DiscrepancyPct      float64   `json:"discrepancy_pct"`
+
+	// OMS model identity fields (schema v1.1.1) — all optional.
+	ModelSignerIdentity    string `json:"model_signer_identity,omitempty"`
+	ModelSignatureVerified bool   `json:"model_signature_verified,omitempty"`
 }

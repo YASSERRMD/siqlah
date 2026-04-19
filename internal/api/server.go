@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/yasserrmd/siqlah/internal/checkpoint"
+	"github.com/yasserrmd/siqlah/internal/model"
 	"github.com/yasserrmd/siqlah/internal/store"
 	"github.com/yasserrmd/siqlah/internal/x402"
 	"github.com/yasserrmd/siqlah/pkg/vur"
@@ -23,6 +24,7 @@ type Server struct {
 	version      string
 	logOrigin    string
 	x402Bridge   *x402.Bridge
+	modelReg     *model.Registry
 }
 
 // providerRegistry abstracts the provider.Registry for test injection.
@@ -67,6 +69,7 @@ func NewWithOrigin(
 		version:      version,
 		logOrigin:    logOrigin,
 		x402Bridge:   x402.NewBridge(),
+		modelReg:     model.NewRegistry(),
 	}
 }
 
