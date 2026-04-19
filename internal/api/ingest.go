@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yasserrmd/siqlah/internal/energy"
 	"github.com/yasserrmd/siqlah/internal/model"
 	"github.com/yasserrmd/siqlah/pkg/vur"
 )
@@ -125,6 +126,7 @@ func (s *Server) buildReceipt(req IngestRequest) (*vur.Receipt, error) {
 
 	// Populate OMS model identity fields (graceful degradation on failure).
 	s.populateModelIdentity(receipt, req.ModelSignatureBundle)
+	s.populateEnergyFields(receipt)
 
 	if err := vur.SignReceipt(receipt, s.operatorPriv); err != nil {
 		return nil, err
@@ -159,6 +161,24 @@ func (s *Server) populateModelIdentity(r *vur.Receipt, bundleJSON string) {
 	}
 	r.ModelSignerIdentity = id.SignerIdentity
 	r.ModelSignatureVerified = id.Verified
+}
+
+// populateEnergyFields estimates energy and carbon footprint for the receipt.
+func (s *Server) populateEnergyFields(r *vur.Receipt) {
+	est, err := s.energyEst.Estimate(r.Model, r.InputTokens, r.OutputTokens)
+	if err != nil || est.Source == energy.SourceNone {
+		r.EnergySource = energy.SourceNone
+		return
+	}
+	r.EnergyEstimateJoules = est.Joules
+	r.EnergySource = est.Source
+	if s.inferenceRegion != "" {
+		intensity, err := s.carbonLookup.Intensity(s.inferenceRegion)
+		if err == nil {
+			r.CarbonIntensityGCO2ePerKWh = intensity
+			r.InferenceRegion = s.inferenceRegion
+		}
+	}
 }
 
 func hashBytes(b []byte) string {
