@@ -17,6 +17,7 @@ type Checkpoint struct {
 	PreviousRootHex string
 	IssuedAt        time.Time
 	OperatorSigHex  string
+	RekorLogIndex   int64 // -1 if not yet anchored to Rekor
 }
 
 // StoreStats holds aggregate statistics about the store.
@@ -80,6 +81,7 @@ type Store interface {
 	GetCheckpoint(id int64) (*Checkpoint, error)
 	ListCheckpoints(offset, limit int) ([]Checkpoint, error)
 	LatestCheckpoint() (*Checkpoint, error)
+	UpdateCheckpointRekorIndex(cpID, logIndex int64) error
 
 	// Witness operations
 	AddWitnessSignature(cpID int64, witnessID, sigHex string) error

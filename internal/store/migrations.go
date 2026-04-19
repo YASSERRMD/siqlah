@@ -1,10 +1,13 @@
 package store
 
-import "database/sql"
+import (
+	"database/sql"
+	"strings"
+)
 
 // Migrate applies all schema migrations in order.
 func Migrate(db *sql.DB) error {
-	migrations := []string{
+	ddl := []string{
 		`CREATE TABLE IF NOT EXISTS schema_version (
 			version INTEGER NOT NULL
 		)`,
@@ -35,10 +38,25 @@ func Migrate(db *sql.DB) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_witness_cp ON witness_signatures(checkpoint_id)`,
 	}
-	for _, m := range migrations {
+	for _, m := range ddl {
 		if _, err := db.Exec(m); err != nil {
 			return err
 		}
 	}
+
+	// Additive column migrations — idempotent (ignore "duplicate column" errors).
+	addColumns := []string{
+		`ALTER TABLE checkpoints ADD COLUMN rekor_log_index INTEGER NOT NULL DEFAULT -1`,
+	}
+	for _, m := range addColumns {
+		if _, err := db.Exec(m); err != nil && !isDuplicateColumn(err) {
+			return err
+		}
+	}
 	return nil
+}
+
+func isDuplicateColumn(err error) bool {
+	return strings.Contains(err.Error(), "duplicate column") ||
+		strings.Contains(err.Error(), "already exists")
 }

@@ -114,7 +114,7 @@ func (s *SQLiteStore) SaveCheckpoint(c Checkpoint) (int64, error) {
 func (s *SQLiteStore) GetCheckpoint(id int64) (*Checkpoint, error) {
 	row := s.db.QueryRow(
 		`SELECT id, batch_start, batch_end, tree_size, root_hex, previous_root_hex,
-		        issued_at, operator_sig_hex
+		        issued_at, operator_sig_hex, rekor_log_index
 		 FROM checkpoints WHERE id=?`, id)
 	return scanCheckpoint(row)
 }
@@ -122,7 +122,7 @@ func (s *SQLiteStore) GetCheckpoint(id int64) (*Checkpoint, error) {
 func (s *SQLiteStore) ListCheckpoints(offset, limit int) ([]Checkpoint, error) {
 	rows, err := s.db.Query(
 		`SELECT id, batch_start, batch_end, tree_size, root_hex, previous_root_hex,
-		        issued_at, operator_sig_hex
+		        issued_at, operator_sig_hex, rekor_log_index
 		 FROM checkpoints ORDER BY id DESC LIMIT ? OFFSET ?`, limit, offset)
 	if err != nil {
 		return nil, err
@@ -142,9 +142,15 @@ func (s *SQLiteStore) ListCheckpoints(offset, limit int) ([]Checkpoint, error) {
 func (s *SQLiteStore) LatestCheckpoint() (*Checkpoint, error) {
 	row := s.db.QueryRow(
 		`SELECT id, batch_start, batch_end, tree_size, root_hex, previous_root_hex,
-		        issued_at, operator_sig_hex
+		        issued_at, operator_sig_hex, rekor_log_index
 		 FROM checkpoints ORDER BY id DESC LIMIT 1`)
 	return scanCheckpoint(row)
+}
+
+func (s *SQLiteStore) UpdateCheckpointRekorIndex(cpID, logIndex int64) error {
+	_, err := s.db.Exec(
+		`UPDATE checkpoints SET rekor_log_index=? WHERE id=?`, logIndex, cpID)
+	return err
 }
 
 func (s *SQLiteStore) AddWitnessSignature(cpID int64, witnessID, sigHex string) error {
@@ -236,7 +242,7 @@ func scanCheckpoint(s scanner) (*Checkpoint, error) {
 	var issuedUnix int64
 	err := s.Scan(
 		&cp.ID, &cp.BatchStart, &cp.BatchEnd, &cp.TreeSize,
-		&cp.RootHex, &cp.PreviousRootHex, &issuedUnix, &cp.OperatorSigHex,
+		&cp.RootHex, &cp.PreviousRootHex, &issuedUnix, &cp.OperatorSigHex, &cp.RekorLogIndex,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -253,7 +259,7 @@ func scanCheckpointRow(rows *sql.Rows) (*Checkpoint, error) {
 	var issuedUnix int64
 	err := rows.Scan(
 		&cp.ID, &cp.BatchStart, &cp.BatchEnd, &cp.TreeSize,
-		&cp.RootHex, &cp.PreviousRootHex, &issuedUnix, &cp.OperatorSigHex,
+		&cp.RootHex, &cp.PreviousRootHex, &issuedUnix, &cp.OperatorSigHex, &cp.RekorLogIndex,
 	)
 	if err != nil {
 		return nil, err
