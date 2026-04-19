@@ -43,3 +43,7 @@ docker-up:
 clean:
 	rm -rf $(BINARY_DIR)
 	cd $(TOKENIZER_DIR) && $(CARGO) clean
+
+# build-legacy: build with SQLite-only mode (no Tessera)
+build-legacy:
+	go build -tags sqlite_legacy -o bin/ ./cmd/...
