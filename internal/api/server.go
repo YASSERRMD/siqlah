@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/yasserrmd/siqlah/internal/checkpoint"
+	"github.com/yasserrmd/siqlah/internal/energy"
 	"github.com/yasserrmd/siqlah/internal/model"
 	"github.com/yasserrmd/siqlah/internal/store"
 	"github.com/yasserrmd/siqlah/internal/x402"
@@ -16,15 +17,18 @@ import (
 
 // Server is the HTTP API server for siqlah.
 type Server struct {
-	store        store.Store
-	builder      *checkpoint.Builder
-	operatorPub  ed25519.PublicKey
-	operatorPriv ed25519.PrivateKey
-	registry     providerRegistry
-	version      string
-	logOrigin    string
-	x402Bridge   *x402.Bridge
-	modelReg     *model.Registry
+	store           store.Store
+	builder         *checkpoint.Builder
+	operatorPub     ed25519.PublicKey
+	operatorPriv    ed25519.PrivateKey
+	registry        providerRegistry
+	version         string
+	logOrigin       string
+	x402Bridge      *x402.Bridge
+	modelReg        *model.Registry
+	energyEst       *energy.BenchmarkEstimator
+	carbonLookup    *energy.StaticCarbonLookup
+	inferenceRegion string
 }
 
 // providerRegistry abstracts the provider.Registry for test injection.
@@ -44,6 +48,26 @@ func New(
 	return NewWithOrigin(st, b, operatorPub, operatorPriv, reg, version, "")
 }
 
+// NewWithOptions creates a Server with optional inference region for energy reporting.
+// Delegates to NewWithOrigin with logOrigin defaulting to empty string.
+func NewWithOptions(
+	st store.Store,
+	b *checkpoint.Builder,
+	operatorPub ed25519.PublicKey,
+	operatorPriv ed25519.PrivateKey,
+	reg providerRegistry,
+	version string,
+	inferenceRegion string,
+) *Server {
+	s := NewWithOrigin(st, b, operatorPub, operatorPriv, reg, version, "")
+	s.inferenceRegion = inferenceRegion
+	if inferenceRegion != "" && s.energyEst == nil {
+		s.energyEst = energy.NewBenchmarkEstimator()
+		s.carbonLookup = energy.NewStaticCarbonLookup()
+	}
+	return s
+}
+
 // NewWithOrigin creates a new Server with a custom C2SP log origin string.
 func NewWithOrigin(
 	st store.Store,
@@ -61,15 +85,17 @@ func NewWithOrigin(
 		logOrigin = "siqlah.dev/log"
 	}
 	return &Server{
-		store:        st,
-		builder:      b,
-		operatorPub:  operatorPub,
-		operatorPriv: operatorPriv,
-		registry:     reg,
-		version:      version,
-		logOrigin:    logOrigin,
-		x402Bridge:   x402.NewBridge(),
-		modelReg:     model.NewRegistry(),
+		store:           st,
+		builder:         b,
+		operatorPub:     operatorPub,
+		operatorPriv:    operatorPriv,
+		registry:        reg,
+		version:         version,
+		logOrigin:       logOrigin,
+		x402Bridge:      x402.NewBridge(),
+		modelReg:        model.NewRegistry(),
+		energyEst:       energy.NewBenchmarkEstimator(),
+		carbonLookup:    energy.NewStaticCarbonLookup(),
 	}
 }
 
@@ -106,6 +132,7 @@ func (s *Server) Routes() *http.ServeMux {
 	// Utility routes
 	mux.HandleFunc("GET /v1/health", s.handleHealth)
 	mux.HandleFunc("GET /v1/stats", s.handleStats)
+	mux.HandleFunc("GET /v1/stats/energy", s.handleEnergyStats)
 
 	return mux
 }

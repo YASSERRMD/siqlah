@@ -3,10 +3,15 @@ package energy
 
 import "fmt"
 
+const (
+	SourceModelBenchmark = "model-benchmark"
+	SourceNone           = "none"
+)
+
 // EnergyEstimate holds the result of an energy estimation.
 type EnergyEstimate struct {
 	Joules float64
-	Source string // "model-benchmark" or "none"
+	Source string // SourceModelBenchmark or SourceNone
 }
 
 // EnergyEstimator estimates energy consumption for an AI inference call.
@@ -63,11 +68,11 @@ func NewBenchmarkEstimator() *BenchmarkEstimator {
 func (e *BenchmarkEstimator) Estimate(model string, inputTokens, outputTokens int64) (*EnergyEstimate, error) {
 	b, ok := e.table[model]
 	if !ok {
-		return &EnergyEstimate{Joules: 0, Source: "none"}, nil
+		return &EnergyEstimate{Joules: 0, Source: SourceNone}, nil
 	}
 	joules := b.InputJoulesPerToken*float64(inputTokens) +
 		b.OutputJoulesPerToken*float64(outputTokens)
-	return &EnergyEstimate{Joules: joules, Source: "model-benchmark"}, nil
+	return &EnergyEstimate{Joules: joules, Source: SourceModelBenchmark}, nil
 }
 
 // RegisterModel adds or replaces a benchmark entry.

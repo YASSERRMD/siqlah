@@ -57,6 +57,7 @@ func main() {
 	fulcioURL := flag.String("fulcio-url", "https://fulcio.sigstore.dev", "Fulcio CA endpoint for keyless signing")
 	rekorAnchor := flag.Bool("rekor-anchor", false, "enable periodic Rekor public anchoring")
 	rekorInterval := flag.Duration("rekor-anchor-interval", 24*time.Hour, "interval between Rekor anchoring attempts")
+	inferenceRegion := flag.String("inference-region", "", "cloud region where inference runs (e.g. us-east-1) for carbon reporting")
 	flag.Parse()
 
 	_, _ = *oidcClientID, *oidcIssuer // surfaced for future integration
@@ -133,7 +134,7 @@ func main() {
 		cpBuilder = b
 	}
 	reg := provider.NewRegistry()
-	srv := api.New(st, cpBuilder, operatorPub, operatorPriv, reg, version)
+	srv := api.NewWithOptions(st, cpBuilder, operatorPub, operatorPriv, reg, version, *inferenceRegion)
 
 	// Start periodic batcher.
 	go func() {
