@@ -43,23 +43,8 @@ func buildSubtree(nodes [][32]byte) [32]byte {
 	if len(nodes) == 1 {
 		return nodes[0]
 	}
-	mid := nextPow2(len(nodes))
-	if mid >= len(nodes) {
-		mid = len(nodes) / 2
-		if mid == 0 {
-			mid = 1
-		}
-	}
+	mid := splitPoint(len(nodes))
 	left := buildSubtree(nodes[:mid])
 	right := buildSubtree(nodes[mid:])
 	return HashInternal(left, right)
-}
-
-// nextPow2 returns the largest power of 2 that is < n.
-func nextPow2(n int) int {
-	k := 1
-	for k < n {
-		k <<= 1
-	}
-	return k >> 1
 }

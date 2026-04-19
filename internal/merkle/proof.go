@@ -5,7 +5,8 @@ import (
 	"fmt"
 )
 
-// InclusionProof returns the audit path (sibling hashes) for leaves[index].
+// InclusionProof returns the audit path for leaves[index].
+// Proof is ordered from leaf level (innermost) to root level (outermost).
 func InclusionProof(leaves [][32]byte, index int) ([][32]byte, error) {
 	if len(leaves) == 0 {
 		return nil, errors.New("empty tree")
@@ -18,23 +19,22 @@ func InclusionProof(leaves [][32]byte, index int) ([][32]byte, error) {
 	return path, nil
 }
 
+// collectPath appends siblings from leaf level to root level (inner to outer).
 func collectPath(nodes [][32]byte, index int, path *[][32]byte) {
 	if len(nodes) == 1 {
 		return
 	}
-	mid := splitPoint(len(nodes))
-	if index < mid {
-		sibling := buildSubtree(nodes[mid:])
-		*path = append(*path, sibling)
-		collectPath(nodes[:mid], index, path)
+	k := splitPoint(len(nodes))
+	if index < k {
+		collectPath(nodes[:k], index, path)
+		*path = append(*path, buildSubtree(nodes[k:]))
 	} else {
-		sibling := buildSubtree(nodes[:mid])
-		*path = append(*path, sibling)
-		collectPath(nodes[mid:], index-mid, path)
+		collectPath(nodes[k:], index-k, path)
+		*path = append(*path, buildSubtree(nodes[:k]))
 	}
 }
 
-// splitPoint returns the number of leaves in the left subtree for a tree of size n.
+// splitPoint returns the largest power of 2 strictly less than n.
 func splitPoint(n int) int {
 	k := 1
 	for k < n {
@@ -43,27 +43,37 @@ func splitPoint(n int) int {
 	return k >> 1
 }
 
-// VerifyInclusion verifies that leafHash is in a tree of treeSize leaves with the
-// given root, at the given index, using the provided audit path.
+// VerifyInclusion verifies that leafHash is at index in a tree of treeSize leaves
+// with the given root, using the provided audit path (inner-to-outer order).
 func VerifyInclusion(leafHash, root [32]byte, index, treeSize int, proof [][32]byte) bool {
 	if treeSize == 0 || index < 0 || index >= treeSize {
 		return false
 	}
-	computed := recomputeRoot(leafHash, index, treeSize, proof)
-	return computed == root
-}
 
-func recomputeRoot(hash [32]byte, index, size int, proof [][32]byte) [32]byte {
-	for _, sibling := range proof {
-		mid := splitPoint(size)
-		if index < mid {
-			hash = HashInternal(hash, sibling)
-			size = mid
+	// Precompute top-down directions; proof is bottom-up, so we apply in reverse.
+	goRight := make([]bool, len(proof))
+	n, i := treeSize, index
+	for j := 0; j < len(proof); j++ {
+		k := splitPoint(n)
+		if i < k {
+			goRight[j] = false
+			n = k
 		} else {
-			hash = HashInternal(sibling, hash)
-			index -= mid
-			size -= mid
+			goRight[j] = true
+			i -= k
+			n -= k
 		}
 	}
-	return hash
+
+	// Apply proof[0..] bottom-up using directions in reverse (outer-in → inner-out).
+	hash := leafHash
+	for j := 0; j < len(proof); j++ {
+		d := goRight[len(proof)-1-j]
+		if d {
+			hash = HashInternal(proof[j], hash)
+		} else {
+			hash = HashInternal(hash, proof[j])
+		}
+	}
+	return hash == root
 }

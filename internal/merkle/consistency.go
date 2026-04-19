@@ -7,6 +7,7 @@ import (
 
 // ConsistencyProof returns the hashes needed to prove that the tree of oldSize
 // leaves is a prefix of the tree of newSize leaves (RFC 6962 §2.2).
+// Proof elements are ordered inner-to-outer (leaf-level subtrees first).
 func ConsistencyProof(oldSize, newSize int, leaves [][32]byte) ([][32]byte, error) {
 	if oldSize <= 0 || newSize <= 0 {
 		return nil, errors.New("tree sizes must be positive")
@@ -25,16 +26,18 @@ func ConsistencyProof(oldSize, newSize int, leaves [][32]byte) ([][32]byte, erro
 	return proof, nil
 }
 
-func collectConsistency(m, n int, leaves [][32]byte, startFromScratch bool, proof *[][32]byte) {
+// collectConsistency implements SUBPROOF from RFC 6962 §2.2, appending
+// proof elements inner-to-outer.
+func collectConsistency(m, n int, leaves [][32]byte, b bool, proof *[][32]byte) {
 	if m == n {
-		if !startFromScratch {
+		if !b {
 			*proof = append(*proof, buildSubtree(leaves[:n]))
 		}
 		return
 	}
 	k := splitPoint(n)
 	if m <= k {
-		collectConsistency(m, k, leaves[:k], startFromScratch, proof)
+		collectConsistency(m, k, leaves[:k], b, proof)
 		*proof = append(*proof, buildSubtree(leaves[k:n]))
 	} else {
 		collectConsistency(m-k, n-k, leaves[k:n], false, proof)
@@ -51,37 +54,48 @@ func VerifyConsistency(oldRoot, newRoot [32]byte, oldSize, newSize int, proof []
 	if oldSize == 0 || newSize == 0 || oldSize > newSize {
 		return false
 	}
-
-	var left, right [32]byte
-	node := oldSize - 1
-	i := 0
-
-	// Determine starting hash.
-	if isPow2(oldSize) {
-		left = oldRoot
-		right = oldRoot
-	} else {
-		if i >= len(proof) {
-			return false
-		}
-		left = proof[i]
-		right = proof[i]
-		i++
-	}
-
-	for j := i; j < len(proof); j++ {
-		sibling := proof[j]
-		if node%2 == 1 {
-			left = HashInternal(sibling, left)
-			right = HashInternal(sibling, right)
-		} else if node < newSize-1 {
-			right = HashInternal(right, sibling)
-		}
-		node = (node - 1) / 2
-	}
-	return left == oldRoot && right == newRoot
+	pos := 0
+	gotOld, gotNew, ok := verifySubproof(oldSize, newSize, true, oldRoot, proof, &pos)
+	return ok && pos == len(proof) && gotOld == oldRoot && gotNew == newRoot
 }
 
-func isPow2(n int) bool {
-	return n > 0 && (n&(n-1)) == 0
+// verifySubproof mirrors collectConsistency: it consumes proof elements and
+// returns the reconstructed old-subtree hash and new-subtree hash.
+func verifySubproof(m, n int, b bool, knownRoot [32]byte, proof [][32]byte, pos *int) ([32]byte, [32]byte, bool) {
+	var zero [32]byte
+	if m == n {
+		if b {
+			// The subtree D[0:m] is identical in both trees; its hash is knownRoot.
+			return knownRoot, knownRoot, true
+		}
+		if *pos >= len(proof) {
+			return zero, zero, false
+		}
+		h := proof[*pos]
+		(*pos)++
+		return h, h, true
+	}
+	k := splitPoint(n)
+	if m <= k {
+		leftOld, leftNew, ok := verifySubproof(m, k, b, knownRoot, proof, pos)
+		if !ok {
+			return zero, zero, false
+		}
+		if *pos >= len(proof) {
+			return zero, zero, false
+		}
+		rightHash := proof[*pos]
+		(*pos)++
+		return leftOld, HashInternal(leftNew, rightHash), true
+	}
+	rightOld, rightNew, ok := verifySubproof(m-k, n-k, false, zero, proof, pos)
+	if !ok {
+		return zero, zero, false
+	}
+	if *pos >= len(proof) {
+		return zero, zero, false
+	}
+	leftHash := proof[*pos]
+	(*pos)++
+	return HashInternal(leftHash, rightOld), HashInternal(leftHash, rightNew), true
 }
