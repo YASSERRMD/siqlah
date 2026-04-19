@@ -1,0 +1,17 @@
+{
+  "id": "msg_01XFDUDYJgAACzvnptvVoYEL",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "text",
+      "text": "Hello! How can I assist you today?"
+    }
+  ],
+  "model": "claude-sonnet-4-6",
+  "stop_reason": "end_turn",
+  "usage": {
+    "input_tokens": 120,
+    "output_tokens": 40
+  }
+}
