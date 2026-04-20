@@ -379,6 +379,6 @@ siqlah occupies the pragmatic middle ground: cryptographically strong, operation
 
 ## License
 
-Apache License, Version 2.0. See [LICENSE](LICENSE).
+Polyform Noncommercial License 1.0.0 — free to use, modify, and distribute; commercial use is prohibited. See [LICENSE](LICENSE).
 
 Copyright 2026 [YASSERRMD](https://github.com/YASSERRMD)
