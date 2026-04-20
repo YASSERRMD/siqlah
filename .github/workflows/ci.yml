@@ -3,11 +3,13 @@ name: CI
 on:
   push:
     branches:
-      - 'phase_*'
       - main
+      - 'phase_*'
+      - 'feat/**'
+      - 'fix/**'
+      - 'test/**'
   pull_request:
     branches:
-      - 'phase_*'
       - main
 
 jobs:
