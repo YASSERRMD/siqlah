@@ -3,7 +3,7 @@
 // result with Verified=false and a warning, rather than failing hard.
 package tokenizer
 
-// #cgo LDFLAGS: -L${SRCDIR}/../../tokenizer-rs/target/release -lsiqlah_tokenizer -ldl -lm
+// #cgo LDFLAGS: -L${SRCDIR}/../../tokenizer-rs/target/release -lsiqlah_tokenizer -ldl -lm -Wl,-rpath,${SRCDIR}/../../tokenizer-rs/target/release
 // #include <stdlib.h>
 // extern char* siqlah_tokenize(const char* text, const char* tokenizer_json);
 // extern void  siqlah_free(char* ptr);

@@ -3,11 +3,13 @@ name: CI
 on:
   push:
     branches:
-      - 'phase_*'
       - main
+      - 'phase_*'
+      - 'feat/**'
+      - 'fix/**'
+      - 'test/**'
   pull_request:
     branches:
-      - 'phase_*'
       - main
 
 jobs:
@@ -64,6 +66,8 @@ jobs:
             -timeout 120s
 
       - name: Run CGo tokenizer tests
+        env:
+          LD_LIBRARY_PATH: ${{ github.workspace }}/tokenizer-rs/target/release
         run: go test ./internal/tokenizer/... -timeout 60s
 
       - name: Run go vet
