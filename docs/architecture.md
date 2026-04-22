@@ -2,7 +2,7 @@
 
 ## Overview
 
-siqlah (سِقلة — "polish" or "refinement" in Arabic) is a Verifiable Usage Receipt (VUR) system that brings cryptographic accountability to AI API billing. It answers the question: *"Can I prove what tokens I was billed for, to anyone, without trusting any single party?"*
+siqlah is a Verifiable Usage Receipt (VUR) system that brings cryptographic accountability to AI API billing. It answers the question: *"Can I prove what tokens I was billed for, to anyone, without trusting any single party?"*
 
 ## The Four-Layer Architecture
 
