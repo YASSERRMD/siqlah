@@ -14,7 +14,7 @@ func (s *Server) handleIngestWithPayment(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusPaymentRequired)
-		pr := x402.NewPaymentRequired(r.Header.Get("X-Request-Id"), defaultSchemes())
+		pr := x402.NewPaymentRequired(r.Header.Get("X-Request-Id"), s.paymentSchemes())
 		writeJSON(w, http.StatusPaymentRequired, pr)
 		return
 	}
@@ -64,16 +64,21 @@ func (s *Server) handleGetReceiptPayment(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// defaultSchemes returns the x402 payment schemes accepted by this operator.
-// In production these would be loaded from configuration.
-func defaultSchemes() []x402.PaymentScheme {
+// paymentSchemes returns the x402 payment schemes accepted by this operator.
+// Recipient is set via --x402-recipient; the zero address is returned when unconfigured
+// so that operators must explicitly opt-in before real payments can be routed.
+func (s *Server) paymentSchemes() []x402.PaymentScheme {
+	recipient := s.x402Recipient
+	if recipient == "" {
+		recipient = "0x0000000000000000000000000000000000000000"
+	}
 	return []x402.PaymentScheme{
 		{
 			Scheme:    "x402/evm-token",
 			Network:   "base-mainnet",
 			Amount:    "1000000", // 1 USDC (6 decimals)
 			Token:     "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", // USDC on Base
-			Recipient: "0x0000000000000000000000000000000000000000", // operator wallet
+			Recipient: recipient,
 		},
 	}
 }

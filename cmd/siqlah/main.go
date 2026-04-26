@@ -58,6 +58,7 @@ func main() {
 	rekorAnchor := flag.Bool("rekor-anchor", false, "enable periodic Rekor public anchoring")
 	rekorInterval := flag.Duration("rekor-anchor-interval", 24*time.Hour, "interval between Rekor anchoring attempts")
 	inferenceRegion := flag.String("inference-region", "", "cloud region where inference runs (e.g. us-east-1) for carbon reporting")
+	x402Recipient := flag.String("x402-recipient", "", "EVM address to receive x402 payments (empty disables payment routing)")
 	flag.Parse()
 
 	_, _ = *oidcClientID, *oidcIssuer // surfaced for future integration
@@ -135,6 +136,9 @@ func main() {
 	}
 	reg := provider.NewRegistry()
 	srv := api.NewWithOptions(st, cpBuilder, operatorPub, operatorPriv, reg, version, *inferenceRegion)
+	if *x402Recipient != "" {
+		srv.WithX402Recipient(*x402Recipient)
+	}
 
 	// Start periodic batcher.
 	go func() {

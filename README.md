@@ -25,6 +25,16 @@
 
 ---
 
+## What is siqlah?
+
+siqlah is a **Go + Rust server and CLI toolkit** that creates tamper-evident, cryptographically signed audit receipts for AI API usage. It is a **software transparency and accountability tool** — not a cryptocurrency project, blockchain application, or financial product.
+
+It uses standard **Ed25519 digital signatures** (the same algorithm used by SSH, TLS, and Git) to sign usage receipts, and builds an **append-only Merkle log** (the same data structure used by Certificate Transparency) so that any party can independently verify token counts without trusting the provider or the operator.
+
+The word "private key" appears throughout the codebase and documentation in its standard cryptographic sense: an Ed25519 signing key for receipts and checkpoints, identical in nature to an SSH host key or a TLS client certificate key. It has no connection to cryptocurrency wallets, seed phrases, or blockchain accounts.
+
+---
+
 ## The Problem
 
 Every major AI provider — OpenAI, Anthropic, Google — prints a token count in their API response. That number directly determines your invoice. Yet **no independent party verifies it**. You trust a JSON field.
@@ -210,6 +220,8 @@ siqlah supports two signing backends, selectable with `--signing-backend`:
 |---|---|---|
 | Ed25519 (default) | `ed25519` | Operator-held private key; fast, simple |
 | Fulcio keyless | `fulcio` | OIDC-based ephemeral certificate; no long-lived key required |
+
+> **Note on terminology:** The "private key" used here is an **Ed25519 digital signature key** for signing usage receipts and Merkle checkpoints — a standard cryptographic primitive equivalent to an SSH or TLS signing key. It has no relation to cryptocurrency wallet keys, seed phrases, or blockchain accounts.
 
 Fulcio-signed receipts include a `certificate_pem` field and optionally a `rekor_log_index` for the Rekor transparency log entry.
 

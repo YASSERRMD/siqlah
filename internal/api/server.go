@@ -25,6 +25,7 @@ type Server struct {
 	version         string
 	logOrigin       string
 	x402Bridge      *x402.Bridge
+	x402Recipient   string
 	modelReg        *model.Registry
 	energyEst       *energy.BenchmarkEstimator
 	carbonLookup    *energy.StaticCarbonLookup
@@ -97,6 +98,13 @@ func NewWithOrigin(
 		energyEst:       energy.NewBenchmarkEstimator(),
 		carbonLookup:    energy.NewStaticCarbonLookup(),
 	}
+}
+
+// WithX402Recipient sets the EVM address that receives x402 payments.
+// Must be called before serving requests.
+func (s *Server) WithX402Recipient(addr string) *Server {
+	s.x402Recipient = addr
+	return s
 }
 
 // Routes returns a ServeMux with all API routes registered.
