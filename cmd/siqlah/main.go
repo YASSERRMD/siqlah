@@ -8,7 +8,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -63,6 +63,8 @@ func main() {
 
 	_, _ = *oidcClientID, *oidcIssuer // surfaced for future integration
 
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
 	printBanner()
 
 	// Load or generate the operator keypair.
@@ -71,7 +73,8 @@ func main() {
 	if *operatorKeyHex != "" {
 		privBytes, err := hex.DecodeString(*operatorKeyHex)
 		if err != nil || len(privBytes) != ed25519.PrivateKeySize {
-			log.Fatalf("invalid --operator-key: must be %d-byte hex", ed25519.PrivateKeySize)
+			slog.Error("invalid --operator-key", "expected_bytes", ed25519.PrivateKeySize)
+			os.Exit(1)
 		}
 		operatorPriv = ed25519.PrivateKey(privBytes)
 		operatorPub = operatorPriv.Public().(ed25519.PublicKey)
@@ -79,23 +82,24 @@ func main() {
 		var err error
 		operatorPub, operatorPriv, err = ed25519.GenerateKey(rand.Reader)
 		if err != nil {
-			log.Fatalf("generate operator key: %v", err)
+			slog.Error("generate operator key", "error", err)
+			os.Exit(1)
 		}
-		log.Printf("generated operator key (ephemeral — set --operator-key to persist)")
+		slog.Warn("generated ephemeral operator key — set --operator-key to persist across restarts")
 	}
-	log.Printf("operator public key: %s", hex.EncodeToString(operatorPub))
+	slog.Info("operator key loaded", "public_key", hex.EncodeToString(operatorPub))
 
 	// Wire the signing backend.
 	var receiptSigner signing.Signer
 	switch *signingBackend {
 	case "fulcio":
-		log.Printf("signing backend: fulcio (keyless) — OIDC issuer: %s", *oidcIssuer)
+		slog.Info("signing backend: fulcio (keyless)", "oidc_issuer", *oidcIssuer)
 		receiptSigner = signing.NewFulcioSigner(signing.FulcioOptions{
 			FulcioURL: *fulcioURL,
 			RekorURL:  *rekorURL,
 		})
 	default:
-		log.Printf("signing backend: ed25519")
+		slog.Info("signing backend: ed25519")
 		receiptSigner = signing.NewEd25519Signer(operatorPriv)
 	}
 	_ = receiptSigner // passed to API in future integration
@@ -108,17 +112,19 @@ func main() {
 	var builder interface{ BuildAndSign() (*store.Checkpoint, error) }
 
 	if *logBackend == "tessera" {
-		log.Printf("using Tessera backend at %s", *tesseraPath)
+		slog.Info("using Tessera backend", "path", *tesseraPath)
 		ts, err := store.NewTesseraStore(ctx, *dbPath, *tesseraPath, *tesseraLogName, operatorPriv)
 		if err != nil {
-			log.Fatalf("open tessera store: %v", err)
+			slog.Error("open tessera store", "error", err)
+			os.Exit(1)
 		}
 		st = ts
 		builder = checkpoint.NewTesseraBuilder(st, operatorPriv, *maxBatch)
 	} else {
 		sqlite, err := store.Open(*dbPath)
 		if err != nil {
-			log.Fatalf("open store: %v", err)
+			slog.Error("open store", "error", err)
+			os.Exit(1)
 		}
 		st = sqlite
 		builder = checkpoint.NewBuilder(st, operatorPriv, *maxBatch)
@@ -151,9 +157,9 @@ func main() {
 			case <-ticker.C:
 				cp, err := builder.BuildAndSign()
 				if err != nil {
-					log.Printf("batcher: build checkpoint: %v", err)
+					slog.Error("batcher: build checkpoint failed", "error", err)
 				} else if cp != nil {
-					log.Printf("batcher: checkpoint %d built (tree_size=%d)", cp.ID, cp.TreeSize)
+					slog.Info("batcher: checkpoint built", "id", cp.ID, "tree_size", cp.TreeSize)
 				}
 			}
 		}
@@ -163,11 +169,12 @@ func main() {
 	if *rekorAnchor {
 		ra, err := anchor.NewRekorAnchor(*rekorURL)
 		if err != nil {
-			log.Fatalf("create rekor anchor: %v", err)
+			slog.Error("create rekor anchor", "error", err)
+			os.Exit(1)
 		}
 		sched := anchor.NewAnchorScheduler(ra, st, *rekorInterval)
 		go sched.Run(ctx)
-		log.Printf("rekor anchoring enabled: %s every %s", *rekorURL, *rekorInterval)
+		slog.Info("rekor anchoring enabled", "url", *rekorURL, "interval", *rekorInterval)
 	}
 
 	// Optionally start discrepancy monitor.
@@ -199,18 +206,19 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigCh
-		log.Println("shutting down...")
+		slog.Info("shutting down...")
 		cancel()
 		shutCtx, shutCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutCancel()
 		if err := httpSrv.Shutdown(shutCtx); err != nil {
-			log.Printf("shutdown: %v", err)
+			slog.Error("graceful shutdown error", "error", err)
 		}
 	}()
 
-	log.Printf("siqlah %s (%s) listening on %s", version, commitSHA, *addr)
+	slog.Info("siqlah listening", "version", version, "commit", commitSHA, "addr", *addr)
 	if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("listen: %v", err)
+		slog.Error("listen failed", "error", err)
+		os.Exit(1)
 	}
 }
 
@@ -223,12 +231,12 @@ func parseWitnesses(s string) map[string]ed25519.PublicKey {
 	for _, pair := range strings.Split(s, ",") {
 		parts := strings.SplitN(strings.TrimSpace(pair), "=", 2)
 		if len(parts) != 2 {
-			log.Printf("warning: invalid witness pair %q, expected id=pubhex", pair)
+			slog.Warn("invalid witness pair, expected id=pubhex", "pair", pair)
 			continue
 		}
 		b, err := hex.DecodeString(parts[1])
 		if err != nil || len(b) != ed25519.PublicKeySize {
-			log.Printf("warning: invalid witness pubkey for %q", parts[0])
+			slog.Warn("invalid witness pubkey", "id", parts[0])
 			continue
 		}
 		out[parts[0]] = ed25519.PublicKey(b)

@@ -1,9 +1,12 @@
 package api
 
 import (
+	"context"
 	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -14,6 +17,10 @@ import (
 	"github.com/yasserrmd/siqlah/internal/x402"
 	"github.com/yasserrmd/siqlah/pkg/vur"
 )
+
+type contextKey string
+
+const requestIDKey contextKey = "request_id"
 
 // Server is the HTTP API server for siqlah.
 type Server struct {
@@ -147,18 +154,40 @@ func (s *Server) Routes() *http.ServeMux {
 	return mux
 }
 
-// Handler returns the root handler with logging and CORS middleware applied.
+// Handler returns the root handler with request-ID, logging, and CORS middleware applied.
 func (s *Server) Handler() http.Handler {
-	return corsMiddleware(loggingMiddleware(s.Routes()))
+	return corsMiddleware(requestIDMiddleware(loggingMiddleware(s.Routes())))
 }
 
-// loggingMiddleware logs each request method, path, and duration.
+// requestIDMiddleware attaches a unique X-Request-ID to each request context and response header.
+func requestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := r.Header.Get("X-Request-ID")
+		if id == "" {
+			var buf [8]byte
+			_, _ = rand.Read(buf[:])
+			id = hex.EncodeToString(buf[:])
+		}
+		w.Header().Set("X-Request-ID", id)
+		ctx := context.WithValue(r.Context(), requestIDKey, id)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// loggingMiddleware logs each request method, path, status code, and duration using slog.
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rw := &responseWriter{ResponseWriter: w, code: http.StatusOK}
 		next.ServeHTTP(rw, r)
-		log.Printf("%s %s %d %s", r.Method, r.URL.Path, rw.code, time.Since(start))
+		reqID, _ := r.Context().Value(requestIDKey).(string)
+		slog.Info("request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", rw.code,
+			"duration_ms", time.Since(start).Milliseconds(),
+			"request_id", reqID,
+		)
 	})
 }
 
@@ -167,7 +196,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return

@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -208,7 +208,7 @@ func (s *Server) populateModelIdentity(r *vur.Receipt, bundleJSON string) {
 		bundleJSON, _ = model.ParseBundleFromPEM(bundleJSON)
 		id, err := model.VerifyModelIdentity(bundleJSON, r.Model, model.VerifyOptions{})
 		if err != nil {
-			log.Printf("OMS bundle verification failed for model %q: %v", r.Model, err)
+			slog.Warn("OMS bundle verification failed", "model", r.Model, "error", err)
 			return
 		}
 		r.ModelSignerIdentity = id.SignerIdentity
