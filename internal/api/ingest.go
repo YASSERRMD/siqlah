@@ -110,7 +110,7 @@ func (s *Server) buildReceipt(req IngestRequest) (*vur.Receipt, error) {
 
 	receipt := &vur.Receipt{
 		ID:              uuid.New().String(),
-		Version:         "1.0.0",
+		Version:         "1.1.0",
 		Tenant:          req.Tenant,
 		Provider:        req.Provider,
 		Model:           req.Model,
