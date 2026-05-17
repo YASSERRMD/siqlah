@@ -1,0 +1,38 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - gosimple
+    - ineffassign
+    - unused
+    - gofmt
+    - misspell
+    - unconvert
+    - bodyclose
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+  govet:
+    enable-all: false
+  gofmt:
+    simplify: true
+
+issues:
+  exclude-rules:
+    # Test files may use unsafe assertions and blank identifiers freely.
+    - path: "_test\\.go"
+      linters:
+        - errcheck
+    # Generated or legacy files.
+    - path: "internal/merkle/"
+      linters:
+        - unused
+  max-issues-per-linter: 50
+  max-same-issues: 10

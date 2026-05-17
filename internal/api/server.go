@@ -31,6 +31,8 @@ type Server struct {
 	registry        providerRegistry
 	version         string
 	logOrigin       string
+	logBackend      string
+	signerType      string
 	x402Bridge      *x402.Bridge
 	x402Recipient   string
 	modelReg        *model.Registry
@@ -111,6 +113,13 @@ func NewWithOrigin(
 // Must be called before serving requests.
 func (s *Server) WithX402Recipient(addr string) *Server {
 	s.x402Recipient = addr
+	return s
+}
+
+// WithBackendInfo sets the log backend and signer type strings surfaced by GET /v1/health.
+func (s *Server) WithBackendInfo(logBackend, signerType string) *Server {
+	s.logBackend = logBackend
+	s.signerType = signerType
 	return s
 }
 

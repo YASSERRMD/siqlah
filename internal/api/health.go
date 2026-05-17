@@ -2,12 +2,16 @@ package api
 
 import (
 	"net/http"
+	"time"
 )
 
 // HealthResponse is returned by GET /v1/health.
 type HealthResponse struct {
-	Status  string `json:"status"`
-	Version string `json:"version"`
+	Status     string `json:"status"`
+	Version    string `json:"version"`
+	LogBackend string `json:"log_backend,omitempty"`
+	SignerType  string `json:"signer_type,omitempty"`
+	Timestamp  string `json:"timestamp"`
 }
 
 // StatsResponse is returned by GET /v1/stats.
@@ -19,18 +23,20 @@ type StatsResponse struct {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	resp := HealthResponse{
+		Version:    s.version,
+		LogBackend: s.logBackend,
+		SignerType:  s.signerType,
+		Timestamp:  time.Now().UTC().Format(time.RFC3339),
+	}
 	// Probe DB connectivity via Stats (lightweight query).
 	if _, err := s.store.Stats(); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, HealthResponse{
-			Status:  "degraded",
-			Version: s.version,
-		})
+		resp.Status = "degraded"
+		writeJSON(w, http.StatusServiceUnavailable, resp)
 		return
 	}
-	writeJSON(w, http.StatusOK, HealthResponse{
-		Status:  "ok",
-		Version: s.version,
-	})
+	resp.Status = "ok"
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
