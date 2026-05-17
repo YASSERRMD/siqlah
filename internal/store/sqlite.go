@@ -62,6 +62,16 @@ func (s *SQLiteStore) GetReceiptByID(id string) (*StoredReceipt, error) {
 	return &StoredReceipt{RowID: rowID, Receipt: r}, nil
 }
 
+func (s *SQLiteStore) ListReceipts(offset, limit int) ([]StoredReceipt, error) {
+	rows, err := s.db.Query(
+		`SELECT id, receipt_json FROM receipts ORDER BY id DESC LIMIT ? OFFSET ?`, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanStoredReceipts(rows)
+}
+
 func (s *SQLiteStore) FetchUnbatched(limit int) ([]StoredReceipt, error) {
 	rows, err := s.db.Query(
 		`SELECT id, receipt_json FROM receipts WHERE batched=0 ORDER BY id ASC LIMIT ?`, limit)

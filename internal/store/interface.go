@@ -72,6 +72,7 @@ type Store interface {
 	// Receipt operations
 	AppendReceipt(r vur.Receipt) (int64, error)
 	GetReceiptByID(id string) (*StoredReceipt, error)
+	ListReceipts(offset, limit int) ([]StoredReceipt, error)
 	FetchUnbatched(limit int) ([]StoredReceipt, error)
 	MarkBatched(ids []int64) error
 	GetReceiptsByRange(startID, endID int64) ([]vur.Receipt, error)

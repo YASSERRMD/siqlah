@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -95,6 +96,47 @@ func (s *Server) handleIngestBatch(w http.ResponseWriter, r *http.Request) {
 		receipts = append(receipts, receipt)
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"count": len(receipts), "receipts": receipts})
+}
+
+// ListReceiptsResponse is returned by GET /v1/receipts.
+type ListReceiptsResponse struct {
+	Receipts []vur.Receipt `json:"receipts"`
+	Offset   int           `json:"offset"`
+	Limit    int           `json:"limit"`
+	Count    int           `json:"count"`
+}
+
+func (s *Server) handleListReceipts(w http.ResponseWriter, r *http.Request) {
+	const defaultLimit = 50
+	const maxLimit = 500
+
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 {
+		limit = defaultLimit
+	}
+	if limit > maxLimit {
+		limit = maxLimit
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	stored, err := s.store.ListReceipts(offset, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "list receipts: "+err.Error())
+		return
+	}
+	receipts := make([]vur.Receipt, len(stored))
+	for i, sr := range stored {
+		receipts[i] = sr.Receipt
+	}
+	writeJSON(w, http.StatusOK, ListReceiptsResponse{
+		Receipts: receipts,
+		Offset:   offset,
+		Limit:    limit,
+		Count:    len(receipts),
+	})
 }
 
 func (s *Server) handleGetReceipt(w http.ResponseWriter, r *http.Request) {
