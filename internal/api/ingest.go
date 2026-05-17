@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"time"
@@ -30,10 +31,28 @@ type IngestBatchRequest struct {
 	Items []IngestRequest `json:"items"`
 }
 
+// validateIngestRequest returns an error if any required field is missing.
+func validateIngestRequest(req IngestRequest) error {
+	if req.Provider == "" {
+		return errors.New("provider is required")
+	}
+	if req.Model == "" {
+		return errors.New("model is required")
+	}
+	if len(req.ResponseBody) == 0 {
+		return errors.New("response_body is required")
+	}
+	return nil
+}
+
 func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	var req IngestRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	if err := validateIngestRequest(req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	receipt, err := s.buildReceipt(req)
@@ -60,6 +79,10 @@ func (s *Server) handleIngestBatch(w http.ResponseWriter, r *http.Request) {
 	}
 	receipts := make([]*vur.Receipt, 0, len(req.Items))
 	for _, item := range req.Items {
+		if err := validateIngestRequest(item); err != nil {
+			writeError(w, http.StatusBadRequest, "item error: "+err.Error())
+			return
+		}
 		receipt, err := s.buildReceipt(item)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "item error: "+err.Error())
