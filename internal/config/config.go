@@ -3,6 +3,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -84,6 +85,37 @@ func Defaults() Config {
 		RekorURL:            "https://rekor.sigstore.dev",
 		RekorAnchorInterval: 24 * time.Hour,
 	}
+}
+
+// Validate checks that the config has consistent, usable values.
+// It returns a combined error listing every problem found.
+func (c *Config) Validate() error {
+	var errs []error
+	if c.BatchInterval <= 0 {
+		errs = append(errs, errors.New("batch_interval must be positive"))
+	}
+	if c.MaxBatch <= 0 {
+		errs = append(errs, errors.New("max_batch must be positive"))
+	}
+	if c.LogBackend != "sqlite" && c.LogBackend != "tessera" {
+		errs = append(errs, fmt.Errorf("log_backend must be 'sqlite' or 'tessera', got %q", c.LogBackend))
+	}
+	if c.LogBackend == "tessera" && c.TesseraStoragePath == "" {
+		errs = append(errs, errors.New("tessera_storage_path is required when log_backend is 'tessera'"))
+	}
+	if c.SigningBackend != "ed25519" && c.SigningBackend != "fulcio" {
+		errs = append(errs, fmt.Errorf("signing_backend must be 'ed25519' or 'fulcio', got %q", c.SigningBackend))
+	}
+	if c.SigningBackend == "fulcio" && c.FulcioURL == "" {
+		errs = append(errs, errors.New("fulcio_url is required when signing_backend is 'fulcio'"))
+	}
+	if c.RekorAnchor && c.RekorURL == "" {
+		errs = append(errs, errors.New("rekor_url is required when rekor_anchor is enabled"))
+	}
+	if c.Monitor && c.MonitorInterval <= 0 {
+		errs = append(errs, errors.New("monitor_interval must be positive when monitor is enabled"))
+	}
+	return errors.Join(errs...)
 }
 
 // Load reads a JSON config file from path, merging over defaults.
