@@ -128,7 +128,11 @@ func (s *Server) handleVerifyCheckpoint(w http.ResponseWriter, r *http.Request) 
 	if cp.RekorLogIndex >= 0 {
 		resp.RekorAnchored = true
 		resp.RekorLogIndex = cp.RekorLogIndex
-		resp.RekorEntryURL = "https://rekor.sigstore.dev/api/v1/log/entries?logIndex=" +
+		rekorBase := s.rekorURL
+		if rekorBase == "" {
+			rekorBase = "https://rekor.sigstore.dev"
+		}
+		resp.RekorEntryURL = rekorBase + "/api/v1/log/entries?logIndex=" +
 			strconv.FormatInt(cp.RekorLogIndex, 10)
 	}
 	writeJSON(w, http.StatusOK, resp)

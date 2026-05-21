@@ -143,6 +143,9 @@ func main() {
 	reg := provider.NewRegistry()
 	srv := api.NewWithOptions(st, cpBuilder, operatorPub, operatorPriv, reg, version, *inferenceRegion)
 	srv.WithBackendInfo(*logBackend, *signingBackend)
+	if *rekorURL != "" {
+		srv.WithRekorURL(*rekorURL)
+	}
 	if *x402Recipient != "" {
 		srv.WithX402Recipient(*x402Recipient)
 	}
