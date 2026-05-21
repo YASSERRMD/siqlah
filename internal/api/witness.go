@@ -93,8 +93,8 @@ func (s *Server) handleC2SPCosign(w http.ResponseWriter, r *http.Request) {
 	cosigStore[rootHex] = append(cosigStore[rootHex], rawStr)
 	cosigMu.Unlock()
 
-	w.WriteHeader(http.StatusAccepted)
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
 	_, _ = w.Write([]byte(`{"status":"accepted"}`))
 }
 
