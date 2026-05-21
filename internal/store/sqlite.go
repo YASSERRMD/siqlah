@@ -129,6 +129,14 @@ func (s *SQLiteStore) GetCheckpoint(id int64) (*Checkpoint, error) {
 	return scanCheckpoint(row)
 }
 
+func (s *SQLiteStore) GetCheckpointForRow(rowID int64) (*Checkpoint, error) {
+	row := s.db.QueryRow(
+		`SELECT id, batch_start, batch_end, tree_size, root_hex, previous_root_hex,
+		        issued_at, operator_sig_hex, rekor_log_index
+		 FROM checkpoints WHERE batch_start <= ? AND batch_end >= ? LIMIT 1`, rowID, rowID)
+	return scanCheckpoint(row)
+}
+
 func (s *SQLiteStore) ListCheckpoints(offset, limit int) ([]Checkpoint, error) {
 	rows, err := s.db.Query(
 		`SELECT id, batch_start, batch_end, tree_size, root_hex, previous_root_hex,

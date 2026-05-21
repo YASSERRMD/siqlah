@@ -80,6 +80,7 @@ type Store interface {
 	// Checkpoint operations
 	SaveCheckpoint(c Checkpoint) (int64, error)
 	GetCheckpoint(id int64) (*Checkpoint, error)
+	GetCheckpointForRow(rowID int64) (*Checkpoint, error)
 	ListCheckpoints(offset, limit int) ([]Checkpoint, error)
 	LatestCheckpoint() (*Checkpoint, error)
 	UpdateCheckpointRekorIndex(cpID, logIndex int64) error

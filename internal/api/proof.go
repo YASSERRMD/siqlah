@@ -154,25 +154,9 @@ func (s *Server) handleConsistencyProof(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-// findCheckpointForRow pages through checkpoints to find the one covering rowID.
+// findCheckpointForRow returns the checkpoint whose batch range covers rowID.
 func findCheckpointForRow(st store.Store, rowID int64) (*store.Checkpoint, error) {
-	offset := 0
-	for {
-		batch, err := st.ListCheckpoints(offset, 50)
-		if err != nil {
-			return nil, err
-		}
-		if len(batch) == 0 {
-			return nil, nil
-		}
-		for i := range batch {
-			cp := &batch[i]
-			if cp.BatchStart <= rowID && rowID <= cp.BatchEnd {
-				return cp, nil
-			}
-		}
-		offset += len(batch)
-	}
+	return st.GetCheckpointForRow(rowID)
 }
 
 // buildLeavesAndIndex builds leaf hashes from receipts and returns the index
