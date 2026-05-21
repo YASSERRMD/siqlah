@@ -33,6 +33,7 @@ type Server struct {
 	logOrigin       string
 	logBackend      string
 	signerType      string
+	rekorURL        string
 	x402Bridge      *x402.Bridge
 	x402Recipient   string
 	modelReg        *model.Registry
@@ -109,6 +110,13 @@ func NewWithOrigin(
 // Must be called before serving requests.
 func (s *Server) WithX402Recipient(addr string) *Server {
 	s.x402Recipient = addr
+	return s
+}
+
+// WithRekorURL sets the Rekor transparency log base URL used when building
+// entry links in checkpoint verify responses. Defaults to the public Rekor instance.
+func (s *Server) WithRekorURL(url string) *Server {
+	s.rekorURL = url
 	return s
 }
 
