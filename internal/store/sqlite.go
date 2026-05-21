@@ -44,6 +44,43 @@ func (s *SQLiteStore) AppendReceipt(r vur.Receipt) (int64, error) {
 	return res.LastInsertId()
 }
 
+func (s *SQLiteStore) AppendReceiptsBatch(receipts []vur.Receipt) ([]int64, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	stmt, err := tx.Prepare(`INSERT INTO receipts (receipt_json) VALUES (?)`)
+	if err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	ids := make([]int64, 0, len(receipts))
+	for _, r := range receipts {
+		b, err := json.Marshal(r)
+		if err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("marshal receipt: %w", err)
+		}
+		res, err := stmt.Exec(string(b))
+		if err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("insert receipt: %w", err)
+		}
+		id, err := res.LastInsertId()
+		if err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("last insert id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
+	}
+	return ids, nil
+}
+
 func (s *SQLiteStore) GetReceiptByID(id string) (*StoredReceipt, error) {
 	row := s.db.QueryRow(
 		`SELECT id, receipt_json FROM receipts WHERE json_extract(receipt_json,'$.id')=? LIMIT 1`, id)

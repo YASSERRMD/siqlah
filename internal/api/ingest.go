@@ -98,6 +98,7 @@ func (s *Server) handleIngestBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	receipts := make([]*vur.Receipt, 0, len(req.Items))
+	built := make([]vur.Receipt, 0, len(req.Items))
 	for _, item := range req.Items {
 		if err := validateIngestRequest(item); err != nil {
 			writeError(w, http.StatusBadRequest, "item error: "+err.Error())
@@ -108,11 +109,12 @@ func (s *Server) handleIngestBatch(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "item error: "+err.Error())
 			return
 		}
-		if _, err := s.store.AppendReceipt(*receipt); err != nil {
-			writeError(w, http.StatusInternalServerError, "store receipt: "+err.Error())
-			return
-		}
 		receipts = append(receipts, receipt)
+		built = append(built, *receipt)
+	}
+	if _, err := s.store.AppendReceiptsBatch(built); err != nil {
+		writeError(w, http.StatusInternalServerError, "store receipts: "+err.Error())
+		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"count": len(receipts), "receipts": receipts})
 }

@@ -71,6 +71,7 @@ func ProofHexSlice(proof [][]byte) []string {
 type Store interface {
 	// Receipt operations
 	AppendReceipt(r vur.Receipt) (int64, error)
+	AppendReceiptsBatch(receipts []vur.Receipt) ([]int64, error)
 	GetReceiptByID(id string) (*StoredReceipt, error)
 	ListReceipts(offset, limit int) ([]StoredReceipt, error)
 	FetchUnbatched(limit int) ([]StoredReceipt, error)
