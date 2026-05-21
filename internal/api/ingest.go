@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -86,8 +87,14 @@ func (s *Server) handleIngestBatch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
+	const maxBatchItems = 500
 	if len(req.Items) == 0 {
 		writeError(w, http.StatusBadRequest, "items must not be empty")
+		return
+	}
+	if len(req.Items) > maxBatchItems {
+		writeError(w, http.StatusBadRequest,
+			fmt.Sprintf("batch exceeds maximum of %d items", maxBatchItems))
 		return
 	}
 	receipts := make([]*vur.Receipt, 0, len(req.Items))
