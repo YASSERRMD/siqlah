@@ -71,10 +71,6 @@ func NewWithOptions(
 ) *Server {
 	s := NewWithOrigin(st, b, operatorPub, operatorPriv, reg, version, "")
 	s.inferenceRegion = inferenceRegion
-	if inferenceRegion != "" && s.energyEst == nil {
-		s.energyEst = energy.NewBenchmarkEstimator()
-		s.carbonLookup = energy.NewStaticCarbonLookup()
-	}
 	return s
 }
 
