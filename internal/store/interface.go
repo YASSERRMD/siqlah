@@ -89,6 +89,10 @@ type Store interface {
 	AddWitnessSignature(cpID int64, witnessID, sigHex string) error
 	WitnessSignatures(cpID int64) (map[string]string, error)
 
+	// C2SP cosignature persistence
+	StoreCosignature(rootHex, noteText string) error
+	GetCosignatures(rootHex string) ([]string, error)
+
 	// Tessera-backed log operations (optional; return ErrNotSupported if not available)
 	AppendToLog(receiptCanonicalBytes []byte) (logIndex uint64, err error)
 	GetLogInclusionProof(receiptIndex, treeSize uint64) (*InclusionProofResult, error)

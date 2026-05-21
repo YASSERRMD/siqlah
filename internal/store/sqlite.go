@@ -198,6 +198,31 @@ func (s *SQLiteStore) WitnessSignatures(cpID int64) (map[string]string, error) {
 	return sigs, rows.Err()
 }
 
+func (s *SQLiteStore) StoreCosignature(rootHex, noteText string) error {
+	_, err := s.db.Exec(
+		`INSERT OR IGNORE INTO cosignatures (root_hex, note_text) VALUES (?, ?)`,
+		rootHex, noteText)
+	return err
+}
+
+func (s *SQLiteStore) GetCosignatures(rootHex string) ([]string, error) {
+	rows, err := s.db.Query(
+		`SELECT note_text FROM cosignatures WHERE root_hex=? ORDER BY id ASC`, rootHex)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
 func (s *SQLiteStore) Stats() (*StoreStats, error) {
 	var st StoreStats
 	if err := s.db.QueryRow(`SELECT COUNT(*) FROM receipts`).Scan(&st.TotalReceipts); err != nil {

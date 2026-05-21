@@ -37,6 +37,13 @@ func Migrate(db *sql.DB) error {
 			UNIQUE(checkpoint_id, witness_id)
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_witness_cp ON witness_signatures(checkpoint_id)`,
+		`CREATE TABLE IF NOT EXISTS cosignatures (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			root_hex   TEXT    NOT NULL,
+			note_text  TEXT    NOT NULL,
+			UNIQUE(root_hex, note_text)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_cosig_root ON cosignatures(root_hex)`,
 	}
 	for _, m := range ddl {
 		if _, err := db.Exec(m); err != nil {
