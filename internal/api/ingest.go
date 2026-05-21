@@ -47,8 +47,14 @@ func validateIngestRequest(req IngestRequest) error {
 }
 
 func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MiB
 	var req IngestRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "request body exceeds 1 MiB limit")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
@@ -69,8 +75,14 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleIngestBatch(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10 MiB
 	var req IngestBatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "request body exceeds 10 MiB limit")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 		return
 	}
@@ -107,6 +119,31 @@ type ListReceiptsResponse struct {
 }
 
 func (s *Server) handleListReceipts(w http.ResponseWriter, r *http.Request) {
+	// Range query for the monitor daemon: GET /v1/receipts?batch_start=X&batch_end=Y
+	if bs := r.URL.Query().Get("batch_start"); bs != "" {
+		batchStart, err := strconv.ParseInt(bs, 10, 64)
+		if err != nil || batchStart <= 0 {
+			writeError(w, http.StatusBadRequest, "batch_start must be a positive integer")
+			return
+		}
+		batchEnd, err := strconv.ParseInt(r.URL.Query().Get("batch_end"), 10, 64)
+		if err != nil || batchEnd <= 0 {
+			writeError(w, http.StatusBadRequest, "batch_end must be a positive integer")
+			return
+		}
+		if batchStart > batchEnd {
+			writeError(w, http.StatusBadRequest, "batch_start must not exceed batch_end")
+			return
+		}
+		receipts, err := s.store.GetReceiptsByRange(batchStart, batchEnd)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "fetch receipts: "+err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"receipts": receipts})
+		return
+	}
+
 	const defaultLimit = 50
 	const maxLimit = 500
 
