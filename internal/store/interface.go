@@ -71,6 +71,7 @@ func ProofHexSlice(proof [][]byte) []string {
 type Store interface {
 	// Receipt operations
 	AppendReceipt(r vur.Receipt) (int64, error)
+	AppendReceiptsBatch(receipts []vur.Receipt) ([]int64, error)
 	GetReceiptByID(id string) (*StoredReceipt, error)
 	ListReceipts(offset, limit int) ([]StoredReceipt, error)
 	FetchUnbatched(limit int) ([]StoredReceipt, error)
@@ -80,6 +81,7 @@ type Store interface {
 	// Checkpoint operations
 	SaveCheckpoint(c Checkpoint) (int64, error)
 	GetCheckpoint(id int64) (*Checkpoint, error)
+	GetCheckpointForRow(rowID int64) (*Checkpoint, error)
 	ListCheckpoints(offset, limit int) ([]Checkpoint, error)
 	LatestCheckpoint() (*Checkpoint, error)
 	UpdateCheckpointRekorIndex(cpID, logIndex int64) error
@@ -87,6 +89,10 @@ type Store interface {
 	// Witness operations
 	AddWitnessSignature(cpID int64, witnessID, sigHex string) error
 	WitnessSignatures(cpID int64) (map[string]string, error)
+
+	// C2SP cosignature persistence
+	StoreCosignature(rootHex, noteText string) error
+	GetCosignatures(rootHex string) ([]string, error)
 
 	// Tessera-backed log operations (optional; return ErrNotSupported if not available)
 	AppendToLog(receiptCanonicalBytes []byte) (logIndex uint64, err error)

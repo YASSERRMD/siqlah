@@ -58,6 +58,25 @@ func (ts *TesseraStore) AppendReceipt(r vur.Receipt) (int64, error) {
 	return rowID, nil
 }
 
+// AppendReceiptsBatch appends all receipts atomically to SQLite then adds each to the
+// Tessera log. If the SQLite transaction fails the entire batch is rejected.
+func (ts *TesseraStore) AppendReceiptsBatch(receipts []vur.Receipt) ([]int64, error) {
+	ids, err := ts.SQLiteStore.AppendReceiptsBatch(receipts)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range receipts {
+		cb, err := r.CanonicalBytes()
+		if err != nil {
+			return ids, fmt.Errorf("canonical bytes for log append: %w", err)
+		}
+		if _, err := ts.log.Append(ts.ctx, cb); err != nil {
+			return ids, fmt.Errorf("tessera append: %w", err)
+		}
+	}
+	return ids, nil
+}
+
 // AppendToLog appends raw canonical bytes to the Tessera log and returns the log index.
 func (ts *TesseraStore) AppendToLog(data []byte) (uint64, error) {
 	return ts.log.Append(ts.ctx, data)

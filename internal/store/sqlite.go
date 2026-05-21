@@ -44,6 +44,43 @@ func (s *SQLiteStore) AppendReceipt(r vur.Receipt) (int64, error) {
 	return res.LastInsertId()
 }
 
+func (s *SQLiteStore) AppendReceiptsBatch(receipts []vur.Receipt) ([]int64, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	stmt, err := tx.Prepare(`INSERT INTO receipts (receipt_json) VALUES (?)`)
+	if err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	ids := make([]int64, 0, len(receipts))
+	for _, r := range receipts {
+		b, err := json.Marshal(r)
+		if err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("marshal receipt: %w", err)
+		}
+		res, err := stmt.Exec(string(b))
+		if err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("insert receipt: %w", err)
+		}
+		id, err := res.LastInsertId()
+		if err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("last insert id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
+	}
+	return ids, nil
+}
+
 func (s *SQLiteStore) GetReceiptByID(id string) (*StoredReceipt, error) {
 	row := s.db.QueryRow(
 		`SELECT id, receipt_json FROM receipts WHERE json_extract(receipt_json,'$.id')=? LIMIT 1`, id)
@@ -129,6 +166,14 @@ func (s *SQLiteStore) GetCheckpoint(id int64) (*Checkpoint, error) {
 	return scanCheckpoint(row)
 }
 
+func (s *SQLiteStore) GetCheckpointForRow(rowID int64) (*Checkpoint, error) {
+	row := s.db.QueryRow(
+		`SELECT id, batch_start, batch_end, tree_size, root_hex, previous_root_hex,
+		        issued_at, operator_sig_hex, rekor_log_index
+		 FROM checkpoints WHERE batch_start <= ? AND batch_end >= ? LIMIT 1`, rowID, rowID)
+	return scanCheckpoint(row)
+}
+
 func (s *SQLiteStore) ListCheckpoints(offset, limit int) ([]Checkpoint, error) {
 	rows, err := s.db.Query(
 		`SELECT id, batch_start, batch_end, tree_size, root_hex, previous_root_hex,
@@ -188,6 +233,31 @@ func (s *SQLiteStore) WitnessSignatures(cpID int64) (map[string]string, error) {
 		sigs[wid] = sig
 	}
 	return sigs, rows.Err()
+}
+
+func (s *SQLiteStore) StoreCosignature(rootHex, noteText string) error {
+	_, err := s.db.Exec(
+		`INSERT OR IGNORE INTO cosignatures (root_hex, note_text) VALUES (?, ?)`,
+		rootHex, noteText)
+	return err
+}
+
+func (s *SQLiteStore) GetCosignatures(rootHex string) ([]string, error) {
+	rows, err := s.db.Query(
+		`SELECT note_text FROM cosignatures WHERE root_hex=? ORDER BY id ASC`, rootHex)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
 }
 
 func (s *SQLiteStore) Stats() (*StoreStats, error) {

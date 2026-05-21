@@ -3,17 +3,12 @@ package api
 import (
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"net/http"
-	"sync"
 
 	"github.com/yasserrmd/siqlah/internal/witness"
 	"golang.org/x/mod/sumdb/note"
 )
-
-// cosigStore holds in-memory C2SP cosignatures indexed by root hex.
-// A production system would persist these in the database.
-var cosigMu sync.RWMutex
-var cosigStore = map[string][]string{} // rootHex → []cosig note lines
 
 // handleC2SPCheckpoint serves the latest checkpoint in C2SP signed-note format.
 // Returns text/plain (the note bytes) for witnesses to poll.
@@ -89,9 +84,9 @@ func (s *Server) handleC2SPCosign(w http.ResponseWriter, r *http.Request) {
 
 	rootHex := fmt.Sprintf("%x", cp.RootHash)
 
-	cosigMu.Lock()
-	cosigStore[rootHex] = append(cosigStore[rootHex], rawStr)
-	cosigMu.Unlock()
+	if err := s.store.StoreCosignature(rootHex, rawStr); err != nil {
+		slog.Warn("persist cosignature failed", "root_hex", rootHex, "error", err)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
@@ -132,9 +127,11 @@ func (s *Server) handleC2SPCosignedCheckpoint(w http.ResponseWriter, r *http.Req
 	}
 
 	rootHex := fmt.Sprintf("%x", rootBytes)
-	cosigMu.RLock()
-	cosigs := cosigStore[rootHex]
-	cosigMu.RUnlock()
+	cosigs, err := s.store.GetCosignatures(rootHex)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "fetch cosignatures: "+err.Error())
+		return
+	}
 
 	// Build a combined note: operator sig + all witness cosigs appended.
 	// The combined note text is the same body with all signatures from all notes.
