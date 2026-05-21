@@ -107,6 +107,31 @@ type ListReceiptsResponse struct {
 }
 
 func (s *Server) handleListReceipts(w http.ResponseWriter, r *http.Request) {
+	// Range query for the monitor daemon: GET /v1/receipts?batch_start=X&batch_end=Y
+	if bs := r.URL.Query().Get("batch_start"); bs != "" {
+		batchStart, err := strconv.ParseInt(bs, 10, 64)
+		if err != nil || batchStart <= 0 {
+			writeError(w, http.StatusBadRequest, "batch_start must be a positive integer")
+			return
+		}
+		batchEnd, err := strconv.ParseInt(r.URL.Query().Get("batch_end"), 10, 64)
+		if err != nil || batchEnd <= 0 {
+			writeError(w, http.StatusBadRequest, "batch_end must be a positive integer")
+			return
+		}
+		if batchStart > batchEnd {
+			writeError(w, http.StatusBadRequest, "batch_start must not exceed batch_end")
+			return
+		}
+		receipts, err := s.store.GetReceiptsByRange(batchStart, batchEnd)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "fetch receipts: "+err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"receipts": receipts})
+		return
+	}
+
 	const defaultLimit = 50
 	const maxLimit = 500
 
